@@ -1,0 +1,18 @@
+rules_version = '2';
+// Reglas de seguridad de Hecho en mi Pueblo.
+// - Cualquiera puede LEER el menú y la configuración (lo necesita la página de clientes).
+// - Solo el equipo (usuarios con inicio de sesión que además estén en la colección "staff") lee y escribe
+//   pedidos, domicilios, cobros y cierres. Así nadie de afuera ve nombres, teléfonos ni direcciones.
+// - La colección "staff" solo se edita desde la consola de Firebase.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isStaff() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+    }
+    match /menu/{id}   { allow read: if true; allow write: if isStaff(); }
+    match /config/{id} { allow read: if true; allow write: if isStaff(); }
+    match /staff/{uid} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+    match /{col}/{id}  { allow read, write: if isStaff() && col != "staff"; }
+  }
+}
