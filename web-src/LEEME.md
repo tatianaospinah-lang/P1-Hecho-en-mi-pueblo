@@ -76,7 +76,7 @@ Los clientes **no inician sesión**. En la web pública solo leen el menú:
 - **En la mesa:** arman el pedido y la app genera un **código** que el camarero escribe en *Salón*.
 
 ## Estructura de datos (Firestore)
-`orders` (comandas por estación), `deliveries` (domicilios con historial `log`), `payments` (cobros), `calls` (llamadas de mesa), `closings` (cierres diarios, ID `AAAA-MM-DD`), `menu` (cambios al menú), `config/main` (ajustes), `staff` (equipo autorizado).
+`orders` (comandas por estación), `deliveries` (domicilios con historial `log`), `payments` (cobros), `calls` (llamadas de mesa), `closings` (cierres diarios, ID `AAAA-MM-DD`), `customers` (fichas de cliente, ID = últimos 9 dígitos del teléfono), `campaigns` (campañas de WhatsApp), `menu` (cambios al menú: precio, agotado, si va en el menú del local y/o a domicilio, precio a domicilio), `config/main` (ajustes), `staff` (equipo autorizado).
 
 Las consultas usan índices simples (Firestore los crea solos). Si en la consola del navegador aparece un aviso de índice, el mismo mensaje trae el enlace para crearlo con un clic.
 

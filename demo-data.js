@@ -47,12 +47,83 @@
     log:[{at:hist(140),what:"Pedido recibido por WhatsApp · pago por adelantado con Bizum"},{at:hist(140)+4*M,what:"Pago verificado · Bizum"},{at:hist(140)+20*M,what:"Sale con Kevin"},{at:hist(140)+32*M,what:"Entregado (pagado por adelantado · Bizum)"}]};
   store.payments.pd={table:-1,label:"Domicilio · Jordi Puig",kind:"domicilio",prepaid:true,total:9,tip:0,method:"Bizum",createdAt:hist(140)+32*M};
 
-  // Cierres de días anteriores
-  store.closings[day(1)]={date:day(1),closedAt:now-86400000,orders:41,sales:612.4,byMethod:{Efectivo:180.5,Tarjeta:301.9,Bizum:130,Transferencia:0},diff:0};
-  store.closings[day(2)]={date:day(2),closedAt:now-2*86400000,orders:37,sales:548.1,byMethod:{Efectivo:150,Tarjeta:298.1,Bizum:100,Transferencia:0},diff:-3.2,notes:"Faltan 3,20 € en monedas"};
-  store.closings[day(3)]={date:day(3),closedAt:now-3*86400000,orders:45,sales:689.75,byMethod:{Efectivo:210,Tarjeta:349.75,Bizum:130,Transferencia:0},diff:1.5,notes:"Sobra 1,50 €"};
+  // Cierres de días anteriores (unos 4 meses, con detalle para el panel por periodo)
+  (function(){
+    let seed=11; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+    const MENU=[["Empanadas x3",6,14],["Arepa de choclo",6.5,10],["Calentado paisa",11.5,7],["Huevos pericos",7.5,6],["Tamal tolimense",8.5,5],
+      ["Patacón con hogao",7,6],["Changua",7,3],["Tinto",1.5,22],["Café con leche",2,14],["Capuchino",2.5,11],["Café de olla",2.8,8],["Lulada",4,9],
+      ["Avena helada",3,6],["Chocolate santafereño",5.5,5],["Pandebono",1.8,16],["Almojábana",1.8,10],["Buñuelo",1.5,12],["Obleas",4,4],["Arroz con leche",3.5,4]];
+    const WK=[1.4,0.65,0.75,0.8,0.95,1.25,1.6]; // domingo..sábado
+    const HR=[4,6,4,3,3,5,7,5,3,3,5,6,4,2,1]; // 8..22 (café de mañana y merienda)
+    for(let i=1;i<=125;i++){
+      const dt=new Date(now-i*86400000); dt.setHours(21,30,0,0);
+      const f=WK[dt.getDay()]*(0.85+rnd()*0.3)*(1+(125-i)*0.0018);
+      const top=MENU.map(([n,p,w])=>({name:n,price:p,qty:Math.max(0,Math.round(w*f*(0.7+rnd()*0.6)))}));
+      const sales=Math.round(top.reduce((a,x)=>a+x.price*x.qty,0)*100)/100;
+      const domShare=0.16+rnd()*0.12, domSales=Math.round(sales*domShare*100)/100;
+      const payCount=Math.max(1,Math.round(sales/(11+rnd()*4))), domOrders=Math.round(payCount*domShare*0.7), salaTickets=payCount-domOrders;
+      const card=Math.round(sales*(0.48+rnd()*0.08)*100)/100, bizum=Math.round(sales*(0.15+rnd()*0.06)*100)/100, transf=rnd()<0.15?Math.round(sales*0.02*100)/100:0;
+      const cash=Math.round((sales-card-bizum-transf)*100)/100;
+      const totH=HR.reduce((a,b)=>a+b,0), perH=HR.map(h=>Math.round(h/totH*payCount*(0.6+rnd()*0.8)));
+      const r=rnd(), diff=r<0.72?0:r<0.86?-Math.round(rnd()*500)/100:Math.round(rnd()*300)/100;
+      store.closings[day(i)]={date:day(i),closedAt:dt.getTime(),orders:payCount,salaTickets,domOrders,cancelled:rnd()<0.2?1:0,sales,salaSales:Math.round((sales-domSales)*100)/100,domSales,
+        tips:Math.round(sales*0.02*100)/100,payCount,byMethod:{Efectivo:cash,Tarjeta:card,Bizum:bizum,Transferencia:transf},diff,
+        notes:diff<-2?"Faltan "+(-diff).toFixed(2).replace(".",",")+" € en monedas":"",kitchenAvg:Math.round(8+rnd()*6),delivAvg:Math.round(26+rnd()*10),
+        perH,top:top.map(({name,qty})=>({name,qty})).sort((a,b)=>b.qty-a.qty)};
+    }
+  })();
 
-  store.config.main={tables:10,link:"__DEMO_LINK__",waPhone:"34687703593",deliveryFee:3};
+  // Clientes con historial (fichas) y una campaña de ejemplo
+  (function(){
+    let seed=23; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+    const P={A1:["Empanadas x3",6],A2:["Arepa de choclo",6.5],R1:["Calentado paisa",11.5],R2:["Huevos pericos",7.5],R4:["Tamal tolimense",8.5],A3:["Patacón con hogao",7],
+      B3:["Lulada",4],B1:["Café de olla",2.8],B5:["Chocolate santafereño",5.5],A4:["Pandebono",1.8],A6:["Buñuelo",1.5],P1:["Obleas",4]};
+    const people=[
+      ["Laura Gómez","612345678","C/ de Sants 120, 3º 2ª","Sants",true,["A1","B3"],9,"Sin cebolla en el hogao"],
+      ["Andrés Rojas","698765432","Carrer de Muntaner 45, 1º","08011",true,["R4","B1"],6,"El timbre no funciona, llamar"],
+      ["Marta Pérez","655111222","Av. Paral·lel 80","Poble-sec",false,["A3","A1"],4,""],
+      ["Sofía Martín","633444555","C/ Vilamarí 61, 2º","Sants",true,["B3","A2"],7,""],
+      ["Pau Ferrer","644555666","C/ de Blesa 9","Poble-sec",true,["R1","B1"],5,"Le gusta el ají aparte"],
+      ["Nuria Vidal","677888999","C/ de Tamarit 150","Sant Antoni",true,["A1"],3,""],
+      ["Jordi Puig","600000001","C/ Blai 12","Poble-sec",true,["A1","A4"],8,""],
+      ["Camila Torres","611222333","C/ Mallorca 200, 4º 1ª","08036",true,["R1","B3"],11,"Celíaca: avisar en cocina"],
+      ["Diego Herrera","622111444","C/ de Girona 30","Eixample",true,["R2","B5"],5,""],
+      ["Valentina Ruiz","633222555","Ronda de Sant Antoni 50","Sant Antoni",true,["A2","B3","A6"],6,""],
+      ["Óscar Medina","644333666","C/ de Viladomat 88","Sant Antoni",false,["R1"],2,""],
+      ["Lucía Blanco","655444777","C/ de Creu Coberta 14","Sants",true,["A4","B1","A6"],12,""],
+      ["Santiago López","666555888","Av. de Mistral 22","Sant Antoni",true,["R4"],2,""],
+      ["Paula Navarro","677666999","C/ de Calàbria 101","Eixample",true,["P1","B5"],4,""],
+      ["Felipe Castro","688777000","C/ del Poeta Cabanyes 7","Poble-sec",true,["R1","A1"],3,""],
+      ["Elena Sanz","699888111","C/ de Sepúlveda 60","Sant Antoni",false,["A2"],1,""],
+      ["Mateo Rincón","610999222","C/ de Valladolid 5","Sants",true,["A3","B3"],2,""],
+      ["Isabel Prieto","621000333","Gran Via 400","Eixample",true,["R2"],1,""]];
+    const DAY=86400000;
+    store.customers={};
+    people.forEach(([name,phone,address,barrio,consent,fav,n,notes],pi)=>{
+      const items={}, history=[]; let spent=0;
+      const recency = pi===10||pi===13||pi===15 ? 40+pi : pi%5; // algunos llevan tiempo sin pedir
+      for(let k=0;k<n;k++){
+        const at=now-(recency+k*(4+pi%5)+rnd()*2)*DAY - rnd()*3600000;
+        const lines=fav.map(id=>({id,name:P[id][0],price:P[id][1],qty:1+Math.floor(rnd()*2)}));
+        if(rnd()<0.3){ const ex=Object.keys(P)[Math.floor(rnd()*12)]; lines.push({id:ex,name:P[ex][0],price:P[ex][1],qty:1}); }
+        const total=Math.round((lines.reduce((a,l)=>a+l.price*l.qty,0)+3)*100)/100; spent+=total;
+        lines.forEach(l=>{ const x=items[l.id]||{name:l.name,qty:0}; x.qty+=l.qty; items[l.id]=x; });
+        if(history.length<15) history.push({at,id:"h"+pi+"_"+k,total,ids:lines.map(l=>l.id),txt:lines.map(l=>l.qty+"× "+l.name).join(", ")});
+      }
+      history.sort((a,b)=>b.at-a.at);
+      store.customers[phone]={name,phone,address,barrio,notes,consent,consentAt:consent?now-90*DAY:null,orders:n,spent:Math.round(spent*100)/100,
+        firstAt:history[history.length-1].at,lastAt:history[0].at,items,history,channel:"WhatsApp"};
+    });
+    // campaña: Calentado paisa en promo, creada hace 2 días
+    const cAt=now-2*DAY, rec=Object.keys(store.customers).filter(k=>store.customers[k].consent).slice(0,10);
+    const sent={}; rec.slice(0,7).forEach((k,i)=>sent[k]=cAt+(20+i*3)*60000);
+    ["611222333","644555666","688777000"].forEach((k,i)=>{ const c=store.customers[k]; const at=cAt+(5+i*9)*3600000;
+      c.history.unshift({at,id:"camp"+i,total:Math.round((9.9*(1+i%2)+4+3)*100)/100,ids:["R1","B3"],txt:(1+i%2)+"× Calentado paisa, 1× Lulada"}); c.orders++; c.lastAt=Math.max(c.lastAt,at);
+      c.items.R1=c.items.R1||{name:"Calentado paisa",qty:0}; c.items.R1.qty+=1+i%2; });
+    store.campaigns={k1:{title:"Calentado paisa a 9,90 €",dishId:"R1",dishName:"Calentado paisa",price:9.9,normalPrice:11.5,audience:"todos",days:30,barrio:"",
+      msg:"Hola {nombre} 👋 Hoy en Hecho en mi Pueblo tenemos {plato}{precio}. Pídelo aquí 👉 {link}",createdAt:cAt,until:now+DAY,banner:true,recipients:rec,sent}};
+  })();
+  store.config.main={tables:10,link:"__DEMO_LINK__",waPhone:"34687703593",deliveryFee:3,promo:{campaignId:"k1",dishId:"R1",title:"Calentado paisa a 9,90 €",price:9.9,until:now+86400000}};
 
   // Base de datos en memoria con la misma forma que la real
   const subs=[], fire=()=>subs.slice().forEach(s=>s());

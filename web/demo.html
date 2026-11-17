@@ -64,12 +64,83 @@
     log:[{at:hist(140),what:"Pedido recibido por WhatsApp · pago por adelantado con Bizum"},{at:hist(140)+4*M,what:"Pago verificado · Bizum"},{at:hist(140)+20*M,what:"Sale con Kevin"},{at:hist(140)+32*M,what:"Entregado (pagado por adelantado · Bizum)"}]};
   store.payments.pd={table:-1,label:"Domicilio · Jordi Puig",kind:"domicilio",prepaid:true,total:9,tip:0,method:"Bizum",createdAt:hist(140)+32*M};
 
-  // Cierres de días anteriores
-  store.closings[day(1)]={date:day(1),closedAt:now-86400000,orders:41,sales:612.4,byMethod:{Efectivo:180.5,Tarjeta:301.9,Bizum:130,Transferencia:0},diff:0};
-  store.closings[day(2)]={date:day(2),closedAt:now-2*86400000,orders:37,sales:548.1,byMethod:{Efectivo:150,Tarjeta:298.1,Bizum:100,Transferencia:0},diff:-3.2,notes:"Faltan 3,20 € en monedas"};
-  store.closings[day(3)]={date:day(3),closedAt:now-3*86400000,orders:45,sales:689.75,byMethod:{Efectivo:210,Tarjeta:349.75,Bizum:130,Transferencia:0},diff:1.5,notes:"Sobra 1,50 €"};
+  // Cierres de días anteriores (unos 4 meses, con detalle para el panel por periodo)
+  (function(){
+    let seed=11; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+    const MENU=[["Empanadas x3",6,14],["Arepa de choclo",6.5,10],["Calentado paisa",11.5,7],["Huevos pericos",7.5,6],["Tamal tolimense",8.5,5],
+      ["Patacón con hogao",7,6],["Changua",7,3],["Tinto",1.5,22],["Café con leche",2,14],["Capuchino",2.5,11],["Café de olla",2.8,8],["Lulada",4,9],
+      ["Avena helada",3,6],["Chocolate santafereño",5.5,5],["Pandebono",1.8,16],["Almojábana",1.8,10],["Buñuelo",1.5,12],["Obleas",4,4],["Arroz con leche",3.5,4]];
+    const WK=[1.4,0.65,0.75,0.8,0.95,1.25,1.6]; // domingo..sábado
+    const HR=[4,6,4,3,3,5,7,5,3,3,5,6,4,2,1]; // 8..22 (café de mañana y merienda)
+    for(let i=1;i<=125;i++){
+      const dt=new Date(now-i*86400000); dt.setHours(21,30,0,0);
+      const f=WK[dt.getDay()]*(0.85+rnd()*0.3)*(1+(125-i)*0.0018);
+      const top=MENU.map(([n,p,w])=>({name:n,price:p,qty:Math.max(0,Math.round(w*f*(0.7+rnd()*0.6)))}));
+      const sales=Math.round(top.reduce((a,x)=>a+x.price*x.qty,0)*100)/100;
+      const domShare=0.16+rnd()*0.12, domSales=Math.round(sales*domShare*100)/100;
+      const payCount=Math.max(1,Math.round(sales/(11+rnd()*4))), domOrders=Math.round(payCount*domShare*0.7), salaTickets=payCount-domOrders;
+      const card=Math.round(sales*(0.48+rnd()*0.08)*100)/100, bizum=Math.round(sales*(0.15+rnd()*0.06)*100)/100, transf=rnd()<0.15?Math.round(sales*0.02*100)/100:0;
+      const cash=Math.round((sales-card-bizum-transf)*100)/100;
+      const totH=HR.reduce((a,b)=>a+b,0), perH=HR.map(h=>Math.round(h/totH*payCount*(0.6+rnd()*0.8)));
+      const r=rnd(), diff=r<0.72?0:r<0.86?-Math.round(rnd()*500)/100:Math.round(rnd()*300)/100;
+      store.closings[day(i)]={date:day(i),closedAt:dt.getTime(),orders:payCount,salaTickets,domOrders,cancelled:rnd()<0.2?1:0,sales,salaSales:Math.round((sales-domSales)*100)/100,domSales,
+        tips:Math.round(sales*0.02*100)/100,payCount,byMethod:{Efectivo:cash,Tarjeta:card,Bizum:bizum,Transferencia:transf},diff,
+        notes:diff<-2?"Faltan "+(-diff).toFixed(2).replace(".",",")+" € en monedas":"",kitchenAvg:Math.round(8+rnd()*6),delivAvg:Math.round(26+rnd()*10),
+        perH,top:top.map(({name,qty})=>({name,qty})).sort((a,b)=>b.qty-a.qty)};
+    }
+  })();
 
-  store.config.main={tables:10,link:"https://tatianaospinah-lang.github.io/P1-Hecho-en-mi-pueblo/",waPhone:"34687703593",deliveryFee:3};
+  // Clientes con historial (fichas) y una campaña de ejemplo
+  (function(){
+    let seed=23; const rnd=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; };
+    const P={A1:["Empanadas x3",6],A2:["Arepa de choclo",6.5],R1:["Calentado paisa",11.5],R2:["Huevos pericos",7.5],R4:["Tamal tolimense",8.5],A3:["Patacón con hogao",7],
+      B3:["Lulada",4],B1:["Café de olla",2.8],B5:["Chocolate santafereño",5.5],A4:["Pandebono",1.8],A6:["Buñuelo",1.5],P1:["Obleas",4]};
+    const people=[
+      ["Laura Gómez","612345678","C/ de Sants 120, 3º 2ª","Sants",true,["A1","B3"],9,"Sin cebolla en el hogao"],
+      ["Andrés Rojas","698765432","Carrer de Muntaner 45, 1º","08011",true,["R4","B1"],6,"El timbre no funciona, llamar"],
+      ["Marta Pérez","655111222","Av. Paral·lel 80","Poble-sec",false,["A3","A1"],4,""],
+      ["Sofía Martín","633444555","C/ Vilamarí 61, 2º","Sants",true,["B3","A2"],7,""],
+      ["Pau Ferrer","644555666","C/ de Blesa 9","Poble-sec",true,["R1","B1"],5,"Le gusta el ají aparte"],
+      ["Nuria Vidal","677888999","C/ de Tamarit 150","Sant Antoni",true,["A1"],3,""],
+      ["Jordi Puig","600000001","C/ Blai 12","Poble-sec",true,["A1","A4"],8,""],
+      ["Camila Torres","611222333","C/ Mallorca 200, 4º 1ª","08036",true,["R1","B3"],11,"Celíaca: avisar en cocina"],
+      ["Diego Herrera","622111444","C/ de Girona 30","Eixample",true,["R2","B5"],5,""],
+      ["Valentina Ruiz","633222555","Ronda de Sant Antoni 50","Sant Antoni",true,["A2","B3","A6"],6,""],
+      ["Óscar Medina","644333666","C/ de Viladomat 88","Sant Antoni",false,["R1"],2,""],
+      ["Lucía Blanco","655444777","C/ de Creu Coberta 14","Sants",true,["A4","B1","A6"],12,""],
+      ["Santiago López","666555888","Av. de Mistral 22","Sant Antoni",true,["R4"],2,""],
+      ["Paula Navarro","677666999","C/ de Calàbria 101","Eixample",true,["P1","B5"],4,""],
+      ["Felipe Castro","688777000","C/ del Poeta Cabanyes 7","Poble-sec",true,["R1","A1"],3,""],
+      ["Elena Sanz","699888111","C/ de Sepúlveda 60","Sant Antoni",false,["A2"],1,""],
+      ["Mateo Rincón","610999222","C/ de Valladolid 5","Sants",true,["A3","B3"],2,""],
+      ["Isabel Prieto","621000333","Gran Via 400","Eixample",true,["R2"],1,""]];
+    const DAY=86400000;
+    store.customers={};
+    people.forEach(([name,phone,address,barrio,consent,fav,n,notes],pi)=>{
+      const items={}, history=[]; let spent=0;
+      const recency = pi===10||pi===13||pi===15 ? 40+pi : pi%5; // algunos llevan tiempo sin pedir
+      for(let k=0;k<n;k++){
+        const at=now-(recency+k*(4+pi%5)+rnd()*2)*DAY - rnd()*3600000;
+        const lines=fav.map(id=>({id,name:P[id][0],price:P[id][1],qty:1+Math.floor(rnd()*2)}));
+        if(rnd()<0.3){ const ex=Object.keys(P)[Math.floor(rnd()*12)]; lines.push({id:ex,name:P[ex][0],price:P[ex][1],qty:1}); }
+        const total=Math.round((lines.reduce((a,l)=>a+l.price*l.qty,0)+3)*100)/100; spent+=total;
+        lines.forEach(l=>{ const x=items[l.id]||{name:l.name,qty:0}; x.qty+=l.qty; items[l.id]=x; });
+        if(history.length<15) history.push({at,id:"h"+pi+"_"+k,total,ids:lines.map(l=>l.id),txt:lines.map(l=>l.qty+"× "+l.name).join(", ")});
+      }
+      history.sort((a,b)=>b.at-a.at);
+      store.customers[phone]={name,phone,address,barrio,notes,consent,consentAt:consent?now-90*DAY:null,orders:n,spent:Math.round(spent*100)/100,
+        firstAt:history[history.length-1].at,lastAt:history[0].at,items,history,channel:"WhatsApp"};
+    });
+    // campaña: Calentado paisa en promo, creada hace 2 días
+    const cAt=now-2*DAY, rec=Object.keys(store.customers).filter(k=>store.customers[k].consent).slice(0,10);
+    const sent={}; rec.slice(0,7).forEach((k,i)=>sent[k]=cAt+(20+i*3)*60000);
+    ["611222333","644555666","688777000"].forEach((k,i)=>{ const c=store.customers[k]; const at=cAt+(5+i*9)*3600000;
+      c.history.unshift({at,id:"camp"+i,total:Math.round((9.9*(1+i%2)+4+3)*100)/100,ids:["R1","B3"],txt:(1+i%2)+"× Calentado paisa, 1× Lulada"}); c.orders++; c.lastAt=Math.max(c.lastAt,at);
+      c.items.R1=c.items.R1||{name:"Calentado paisa",qty:0}; c.items.R1.qty+=1+i%2; });
+    store.campaigns={k1:{title:"Calentado paisa a 9,90 €",dishId:"R1",dishName:"Calentado paisa",price:9.9,normalPrice:11.5,audience:"todos",days:30,barrio:"",
+      msg:"Hola {nombre} 👋 Hoy en Hecho en mi Pueblo tenemos {plato}{precio}. Pídelo aquí 👉 {link}",createdAt:cAt,until:now+DAY,banner:true,recipients:rec,sent}};
+  })();
+  store.config.main={tables:10,link:"https://tatianaospinah-lang.github.io/P1-Hecho-en-mi-pueblo/",waPhone:"34687703593",deliveryFee:3,promo:{campaignId:"k1",dishId:"R1",title:"Calentado paisa a 9,90 €",price:9.9,until:now+86400000}};
 
   // Base de datos en memoria con la misma forma que la real
   const subs=[], fire=()=>subs.slice().forEach(s=>s());
@@ -149,6 +220,13 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .nav button[aria-current="page"]{opacity:1;background:rgba(255,255,255,.12);box-shadow:inset 3px 0 0 #F2B13F}
 .nav .cnt{margin-left:auto;min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:#F2B13F;color:#2B1A10;font-size:11.5px;font-weight:800;display:grid;place-items:center}
 .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:12px 8px 0;border-top:1px solid rgba(255,255,255,.1);font-size:12.5px;opacity:.85}
+.themesw{display:flex;background:rgba(255,255,255,.08);border-radius:9px;padding:3px;gap:2px;margin-bottom:6px}
+.themesw button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:0;background:transparent;color:inherit;opacity:.7;padding:6px 4px;border-radius:7px;font-size:12px;font-weight:600}
+.themesw button svg.i{width:15px;height:15px}
+.themesw button:hover{opacity:1}
+.themesw button[aria-pressed="true"]{opacity:1;background:rgba(255,255,255,.18)}
+.tbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:inherit;border-radius:999px;padding:5px 10px 5px 8px;font-size:12px;font-weight:600}
+.tbtn svg.i{width:15px;height:15px}
 .live{display:flex;align-items:center;gap:8px}
 .live i{width:8px;height:8px;border-radius:50%;background:#6CCB97;box-shadow:0 0 0 3px rgba(108,203,151,.2)}
 .live.off i{background:#F2B13F;box-shadow:0 0 0 3px rgba(242,177,63,.2)}
@@ -321,6 +399,59 @@ table.t tr.click:hover td{background:var(--surface-2)}
 .diff .v{font-family:var(--f-mono);font-size:20px}
 .closed{display:flex;gap:10px;align-items:center;background:var(--ok-bg);color:var(--ok);border-radius:10px;padding:10px 14px;font-weight:600}
 
+/* ---------- Panel por periodo (semana, mes, fechas) ---------- */
+:root{--c1:#A0522D;--c2:#3B7DBA;--m0:#5B2A14;--m1:#8A4F2C;--m2:#B98563;--m3:#E3CDB8;--peak:#5B2A14;--heat:#5B2A14}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--c1:#C8743E;--c2:#4A8ED0;--m0:#F0C4A0;--m1:#C88B62;--m2:#93603F;--m3:#5E3D29;--peak:#F6D2B4;--heat:#F0B184}}
+:root[data-theme="dark"]{--c1:#C8743E;--c2:#4A8ED0;--m0:#F0C4A0;--m1:#C88B62;--m2:#93603F;--m3:#5E3D29;--peak:#F6D2B4;--heat:#F0B184}
+.vchart .cw.peak .b{background:var(--peak)}
+.c1{background:var(--c1)} .c2{background:var(--c2)} .m0{background:var(--m0)} .m1{background:var(--m1)} .m2{background:var(--m2)} .m3{background:var(--m3)}
+.kpi .dl{font-weight:700;color:var(--ink-2)} .kpi .dl.up{color:var(--ok)} .kpi .dl.dn{color:var(--crit)}
+.lgd{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--muted)} .lgd span{display:inline-flex;align-items:center;gap:6px} .lgd b{color:var(--ink)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+.dchart{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;height:240px}
+.dchart .yax{display:flex;flex-direction:column;justify-content:space-between;font-size:10.5px;color:var(--muted);font-family:var(--f-mono);text-align:right;padding-bottom:22px;margin-top:-6px}
+.dchart .plot{position:relative;display:flex;flex-direction:column;min-width:0}
+.dchart .grid{position:absolute;inset:0 0 22px 0;display:flex;flex-direction:column-reverse;justify-content:space-between;pointer-events:none}
+.dchart .grid i{display:block;border-top:1px solid var(--line)} .dchart .grid i:first-child{border-top-color:var(--line-2)}
+.dchart .dbars{position:relative;flex:1;display:flex;align-items:flex-end;gap:2px}
+.dchart.wide .dbars{gap:12px}
+.dchart .dcol{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;position:relative;min-width:0;outline:none}
+.dchart .stk{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:2px;min-height:0}
+.dchart .stk i{display:block;min-height:0;flex-basis:0} .dchart .stk i:first-child{border-radius:4px 4px 0 0}
+.dchart .dcol.fut .stk{display:none}
+.dchart .dcol.fut::after{content:"";position:absolute;bottom:0;left:15%;right:15%;border-bottom:2px dotted var(--line-2)}
+.dchart .dcol:hover .stk,.dchart .dcol:focus .stk{filter:brightness(1.15)}
+.dchart .val{position:absolute;left:50%;transform:translateX(-50%);font-size:11.5px;font-weight:700;white-space:nowrap}
+.dchart .xax{display:flex;gap:2px;height:22px;align-items:flex-end;font-size:10.5px;color:var(--muted);font-family:var(--f-mono)} .dchart.wide .xax{gap:12px}
+.dchart .xax span{flex:1;text-align:center;white-space:nowrap;min-width:0;overflow:visible}
+.ptip{display:none;position:absolute;top:0;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:7px 10px;border-radius:7px;white-space:nowrap;z-index:5;pointer-events:none;font-weight:500;text-align:left}
+.dchart .dcol:first-child .ptip,.dchart .dcol:nth-child(2) .ptip{left:0;transform:none}
+.dchart .dcol:last-child .ptip,.dchart .dcol:nth-last-child(2) .ptip{left:auto;right:0;transform:none}
+.dcol:hover .ptip,.dcol:focus .ptip,.heat i:hover .ptip,.heat i:focus .ptip{display:block}
+.heat i .ptip{top:auto;bottom:calc(100% + 6px)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));border-top:1px solid var(--line)}
+.facts>div{padding:12px 16px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--line)} .facts>div:last-child{border-right:0}
+.facts b{font-size:17px;font-weight:800} .facts b.cap{text-transform:capitalize} .facts .muted{font-size:12.5px}
+.heat{display:grid;grid-template-columns:30px repeat(15,minmax(13px,1fr));gap:3px;min-width:300px}
+.heat .hx{font-size:10.5px;color:var(--muted);font-family:var(--f-mono);text-align:center}
+.heat .hy{font-size:12px;color:var(--muted);font-weight:600;align-self:center}
+.heat i,.heatkey i{display:block;aspect-ratio:1;border-radius:4px;background:color-mix(in srgb,var(--heat) var(--k),var(--sunken));position:relative;outline:none}
+.heat i.na{background:var(--sunken);opacity:.5}
+.heat i:hover,.heat i:focus{box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--ink)}
+.heatkey{display:flex;align-items:center;gap:4px;margin-top:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.heatkey i{width:14px;height:14px;aspect-ratio:auto}
+.sbar{display:flex;gap:2px;height:14px;border-radius:5px;overflow:hidden}
+.sbar i{display:block;min-width:0}
+.slist{display:flex;flex-direction:column;gap:6px}
+.slist>div{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:10px;align-items:center;font-size:13.5px}
+.slist>div span{color:var(--muted);min-width:44px;text-align:right} .slist>div b{min-width:84px;text-align:right}
+.hb.rk{grid-template-columns:minmax(150px,1.3fr) minmax(0,1.5fr) auto} .hb.rk .nm{display:flex;gap:8px;align-items:center} .hb.rk .nm em{font-style:normal;font-size:11px;color:var(--muted);min-width:14px;font-weight:700}
+.hb .v small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.drange{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.drange input[type=date]{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:6px 8px;font-size:13px;width:auto;min-width:0}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+@media (max-width:600px){.dchart{height:200px} .dchart.wide .dbars,.dchart.wide .xax{gap:5px} .dchart.wide .xax span{font-size:9.5px} .facts>div{border-right:0;border-bottom:1px solid var(--line)}}
+
 /* ---------- Login (servidor propio) ---------- */
 .login{min-height:100vh;min-height:100svh;box-sizing:border-box;display:grid;place-items:center;padding:32px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px));background:var(--bg)}
 .login-card{width:min(400px,100%);background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
@@ -330,6 +461,30 @@ table.t tr.click:hover td{background:var(--surface-2)}
 .login-brand small{display:block;font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;opacity:.7;margin-top:8px}
 .login a{color:var(--accent);font-weight:600}
 input[type=password]{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:9px 11px;width:100%;min-width:0}
+
+/* ---------- Clientes y campañas ---------- */
+.known{display:flex;flex-direction:column;gap:6px;background:var(--ok-bg);color:var(--ink);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);border-radius:10px;padding:10px 12px;font-size:13px}
+.known>.row b{color:var(--ok);display:inline-flex;gap:6px;align-items:center} .known svg.i{width:15px;height:15px}
+table.t tr.selrow td{background:var(--surface-2);box-shadow:inset 0 0 0 0 transparent}
+table.t tr.selrow td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.hrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.hrow:last-child{border-bottom:0} .hrow>span:nth-child(2){flex:1;min-width:0} .hrow>span:first-child{min-width:54px}
+.hrow>span:first-child:has(b){flex:1;min-width:0}
+.campi{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;width:100%}
+.campi:hover{border-color:var(--muted)} .campi.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)} .campi .muted{font-size:12.5px}
+.campi .obar,.card-b .obar{display:flex;gap:2px;border-radius:5px;overflow:hidden} .obar i{display:block;min-width:0}
+.aud{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.aud button{border:1px solid var(--line-2);background:var(--surface);border-radius:9px;padding:9px 10px;font-weight:600;font-size:13px;text-align:left}
+.aud button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.audn{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13.5px}
+.audn b{font-size:18px}
+.wabubble{background:#DCF8C6;color:#111B21;border-radius:10px 10px 10px 2px;padding:10px 12px;font-size:13.5px;white-space:pre-wrap;word-break:break-word;max-width:420px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.promo{display:flex;gap:12px;align-items:center;margin-top:16px;padding:14px;border-radius:12px;background:var(--cafe);color:#FFF6EC;position:relative;overflow:hidden}
+.promo::after{content:"";position:absolute;inset:auto 0 0 0;height:4px;background:linear-gradient(90deg,#F2B13F 0 50%,#124982 50% 75%,#C8102E 75%)}
+.promo .tx{flex:1;min-width:0} .promo small{display:block;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;opacity:.8;font-weight:800}
+.promo b{display:block;font-size:17px;margin-top:2px} .promo .pr{font-size:15px;font-weight:800;margin-top:4px} .promo s{opacity:.7;font-weight:500;margin-left:6px;font-size:13px}
+.promo .addb{border-color:#FFF6EC;color:#FFF6EC}
+@media (max-width:480px){.aud{grid-template-columns:minmax(0,1fr)}}
 
 /* ---------- Rutas de domicilio ---------- */
 .zones{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0}
@@ -537,6 +692,9 @@ const ALLPAY = ["Tarjeta online","Tarjeta (datáfono)","Bizum al repartidor","Bi
 const CHANNELS = ["WhatsApp","Teléfono","Instagram","Web","Glovo","Uber Eats","Just Eat"];
 const ICONS = {
   hoy:'<path d="M5 20V11M12 20V5M19 20v-6M3 20h18"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
+  moon:'<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  auto:'<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
   lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   mesas:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   cocina:'<path d="M12 3c.8 3 4.5 5 4.5 9.5a4.5 4.5 0 0 1-9 0c0-2.2 1.2-3.6 2.3-4.5.1 2 1 3.2 2.2 3.4C11.5 8.6 11 6 12 3z"/>',
@@ -562,7 +720,10 @@ const ic = (n,cls) => `<svg class="i${cls?" "+cls:""}" viewBox="0 0 24 24" aria-
 
 /* ---------- Estado ---------- */
 const S = {
-  view:"hoy", customer:false, delivery:false, table:1,
+  theme:(()=>{ try{ return localStorage.getItem("hmp-theme")||"system"; }catch(e){ return "system"; } })(),
+  view:"hoy", dTab:"pedidos", menuTab:"dom", customers:[], campaigns:[], custSel:null, custQ:"", custEdit:null, campSel:null, campNew:false,
+  cmp:{dishId:"",price:"",audience:"todos",days:"30",barrio:"",banner:true,valid:"3",msg:""},
+  period:"hoy", pOff:0, rFrom:"", rTo:"", customer:false, delivery:false, table:1,
   todayOrders:[], closings:[], cf:{float:"",counted:"",notes:""}, confirmClose:false,
   db:null, dbState:"loading",
   orders:[], calls:[], payments:[], menuDb:{}, deliveries:[], doneDeliveries:[],
@@ -577,6 +738,13 @@ const S = {
   gForm:{name:"",phone:"",address:"",barrio:"",notes:"",when:"entrega",pay:"Efectivo",cashFor:"",paidOk:false}
 };
 let firstOrders = true, pendingRender = false;
+/* Apariencia: claro, oscuro o automático (según el dispositivo). Se recuerda en cada dispositivo. */
+let themeSet=false; // en "Auto" no se toca lo que ya haya puesto el visor
+function applyTheme(){ const r=document.documentElement; if(S.theme==="light"||S.theme==="dark"){ r.setAttribute("data-theme",S.theme); themeSet=true; } else if(themeSet){ r.removeAttribute("data-theme"); themeSet=false; } }
+function setTheme(v){ S.theme=v; try{ localStorage.setItem("hmp-theme",v); }catch(e){} applyTheme(); }
+const THEMES=[["light","Claro","sun"],["system","Auto","auto"],["dark","Oscuro","moon"]];
+const themeSw = () => `<div class="themesw" role="group" aria-label="Apariencia">${THEMES.map(([v,l,i])=>`<button data-act="theme" data-v="${v}" aria-pressed="${S.theme===v}" title="${l}">${ic(i)}<span>${l}</span></button>`).join("")}</div>`;
+applyTheme();
 const $root = document.getElementById("root");
 const r2 = n => Math.round((+n||0)*100)/100;
 const money = n => r2(n).toLocaleString("es-ES",{style:"currency",currency:"EUR"});
@@ -598,7 +766,15 @@ function menu(){
   return out;
 }
 const item = id => menu().find(m=>m.id===id);
-const cats = () => [...new Set(menu().map(m=>m.cat))];
+/* Dos menús: el del local (igual para todas las mesas) y el de domicilios. ch = "local" | "dom" */
+const inMenu = (m,ch) => ch==="dom" ? m.dom!==false : m.local!==false;
+const chMenu = ch => ch ? menu().filter(m=>inMenu(m,ch)) : menu();
+const cats = ch => [...new Set(chMenu(ch).map(m=>m.cat))];
+function activePromo(){ const p=S.config.promo; if(!p||!p.dishId) return null; if(p.until && Date.now()>p.until) return null; return p; }
+function priceFor(m,ch){
+  if(ch==="dom"){ const p=activePromo(); if(p && p.dishId===m.id && +p.price>0) return +p.price; if(m.domPrice!=null && m.domPrice!=="" && +m.domPrice>0) return +m.domPrice; }
+  return m.price;
+}
 
 /* ---------- Ruta ---------- */
 function readHash(){
@@ -651,8 +827,10 @@ function connect(db, publicOnly){
   db.collection("deliveries").where("paid","==",false).onSnapshot(snap=>{ S.deliveries = snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>a.createdAt-b.createdAt); queueRender(); }, fail);
   db.collection("deliveries").where("createdAt",">=",day.getTime()).onSnapshot(snap=>{ S.doneDeliveries = snap.docs.map(d=>Object.assign({id:d.id},d.data())).filter(d=>d.paid).sort((a,b)=>b.createdAt-a.createdAt); queueRender(); }, fail);
   db.collection("orders").where("createdAt",">=",day.getTime()).onSnapshot(snap=>{ S.todayOrders = snap.docs.map(d=>Object.assign({id:d.id},d.data())); queueRender(); }, fail);
-  db.collection("closings").orderBy("date","desc").limit(14).onSnapshot(snap=>{ S.closings = snap.docs.map(d=>Object.assign({id:d.id},d.data())); queueRender(); }, fail);
+  db.collection("closings").orderBy("date","desc").limit(400).onSnapshot(snap=>{ S.closings = snap.docs.map(d=>Object.assign({id:d.id},d.data())); queueRender(); }, fail);
   db.collection("menu").onSnapshot(snap=>{ const m={}; snap.docs.forEach(d=>m[d.id]=d.data()); S.menuDb=m; queueRender(); }, fail);
+  db.collection("customers").onSnapshot(snap=>{ S.customers = snap.docs.map(d=>Object.assign({id:d.id},d.data())); queueRender(); }, fail);
+  db.collection("campaigns").onSnapshot(snap=>{ S.campaigns = snap.docs.map(d=>Object.assign({id:d.id},d.data())).sort((a,b)=>b.createdAt-a.createdAt); queueRender(); }, fail);
   db.doc("config/main").onSnapshot(snap=>{ if(snap.exists) S.config = Object.assign({},S.config,snap.data()); if(!snap.metadata.fromCache) ok(); queueRender(); }, fail);
 }
 
@@ -692,11 +870,12 @@ function tableInfo(t){
   return {os, cs, state, label, total, first, llama: cs.some(c=>c.type==="mesero")};
 }
 const lineTotal = items => r2(items.reduce((a,i)=>a+i.price*i.qty,0));
-function addTo(cart,id){ const m=item(id); if(!m||m.available===false) return; const l=cart.find(l=>l.id===id&&!l.note); if(l) l.qty++; else cart.push({id,name:m.name,price:m.price,station:m.station,qty:1,note:""}); }
+function addTo(cart,id,ch){ const m=item(id); if(!m||m.available===false) return; const l=cart.find(l=>l.id===id&&!l.note); if(l) l.qty++; else cart.push({id,name:m.name,price:priceFor(m,ch||"local"),station:m.station,qty:1,note:""}); }
 const codeBody = cart => cart.map(l=>l.id+(l.qty>1?"x"+l.qty:"")).join(".");
 function parseCode(code){
   const m = String(code).trim().toUpperCase().replace(/\s+/g,"").match(/^(?:M(\d+)|D)-(.+)$/); if(!m) return null;
-  const cart=[]; for(const part of m[2].split(".")){ const p=part.match(/^([A-Z]+\d+)(?:X(\d+))?$/); if(!p) return null; if(!item(p[1])) return null; for(let i=0;i<(+p[2]||1);i++) addTo(cart,p[1]); }
+  const ch=m[1]!==undefined?"local":"dom";
+  const cart=[]; for(const part of m[2].split(".")){ const p=part.match(/^([A-Z]+\d+)(?:X(\d+))?$/); if(!p) return null; if(!item(p[1])) return null; for(let i=0;i<(+p[2]||1);i++) addTo(cart,p[1],ch); }
   return {table:m[1]!==undefined?+m[1]:-1, cart};
 }
 async function sendOrder(t,cart,source){
@@ -718,14 +897,14 @@ function deliveryMsg(f,cart){
     `Productos: ${money(sub)}`, `Envío: ${money(fee)}`, `Total: ${money(sub+fee)}`,"",
     `Nombre: ${f.name}`, `Teléfono: ${f.phone}`, `Dirección: ${f.address}`, `Barrio o CP: ${f.barrio}`,
     f.when==="ahora" ? `Pago: Ahora · ${f.pay} (ya enviado, por favor verificar)` : `Pago: Al recibir · ${f.pay}${f.pay==="Efectivo"&&f.cashFor?" (paga con "+money(parseEur(f.cashFor))+")":""}`,
-    ...(f.notes?[`Notas: ${f.notes}`]:[]), `Código: D-${codeBody(cart)}`].join("\n");
+    ...(f.notes?[`Notas: ${f.notes}`]:[]), ...(f.consent?["Promociones: Sí, quiero recibirlas"]:[]), `Código: D-${codeBody(cart)}`].join("\n");
 }
 function parseWhatsApp(text){
   const get = k => { const r=new RegExp("^\\s*"+k+"\\s*:\\s*(.+)$","im").exec(text); return r?r[1].trim():""; };
   const code = get("C[oó]digo"), p = code ? parseCode(code) : null;
   const pay = get("Pago"), cash = /paga con\s*([\d.,]+)/i.exec(pay);
   return { cart: p ? p.cart : null, form: { name:get("Nombre"), phone:get("Tel[eé]fono"), address:get("Direcci[oó]n"), barrio:get("Barrio(?: o CP)?"), notes:get("Notas"),
-    when: /ahora|adelantado|ya pag/i.test(pay) ? "ahora" : "entrega",
+    when: /ahora|adelantado|ya pag/i.test(pay) ? "ahora" : "entrega", consent: /^\s*promociones\s*:\s*s[ií]/im.test(text),
     pay: ALLPAY.find(m=>pay.toLowerCase().includes(m.toLowerCase())) || "", cashFor: cash?cash[1]:"" } };
 }
 function dInfo(d){
@@ -735,17 +914,44 @@ function dInfo(d){
   return {os, stage};
 }
 const logAdd = (d,what) => (d.log||[]).concat([{at:Date.now(),what}]);
+
+/* ---------- Fichas de cliente (se llenan solas con cada domicilio) ---------- */
+const custKey = phone => digits(phone).slice(-9);
+const custOf = phone => { const k=custKey(phone); return k.length>=9 ? S.customers.find(c=>c.id===k) : null; };
+function habitual(c){
+  if(!c||!c.items) return [];
+  const n=Math.max(1,c.orders||1);
+  return Object.entries(c.items).filter(([,x])=>x.qty>0).sort((a,b)=>b[1].qty-a[1].qty).slice(0,3)
+    .map(([id,x])=>({id,name:x.name,times:x.qty,qty:Math.max(1,Math.round(x.qty/n))}));
+}
+const daysAgo = ts => ts ? Math.floor((Date.now()-ts)/86400000) : null;
+function agoTxt(ts){ const d=daysAgo(ts); return d==null?"—":d===0?"hoy":d===1?"ayer":`hace ${d} días`; }
+async function upsertCustomer(db,f,items,total,deliveryId,now,sign){
+  const k=custKey(f.phone); if(k.length<9) return;
+  const c=Object.assign({},S.customers.find(x=>x.id===k)||{});
+  const its=Object.assign({},c.items||{});
+  items.forEach(i=>{ const x=Object.assign({name:i.name,qty:0},its[i.id]||{}); x.name=i.name; x.qty=Math.max(0,x.qty+sign*i.qty); its[i.id]=x; });
+  let hist=(c.history||[]).slice();
+  if(sign>0) hist=[{at:now,id:deliveryId,total,ids:items.map(i=>i.id),txt:itemsLine(items).replace(/&[^;]+;/g,"")}].concat(hist).slice(0,15);
+  else hist=hist.filter(x=>x.id!==deliveryId);
+  const doc={name:f.name||c.name||"",phone:f.phone||c.phone||"",address:f.address||c.address||"",barrio:f.barrio||c.barrio||"",notes:c.notes||"",
+    consent: f.consent!=null ? (!!f.consent || !!c.consent) : !!c.consent, consentAt: f.consent&&!c.consent ? now : (c.consentAt||null),
+    orders:Math.max(0,(c.orders||0)+sign), spent:r2(Math.max(0,(c.spent||0)+sign*total)), firstAt:c.firstAt||now, lastAt: sign>0?now:(hist[0]?hist[0].at:c.firstAt||null),
+    items:its, history:hist, channel:f.channel||c.channel||""};
+  await db.doc("customers/"+k).set(doc);
+}
 async function createDelivery(f,cart,source){
   const sub=lineTotal(cart), fee=feeOf(), now=Date.now(), first=(f.name||"Cliente").trim().split(" ")[0];
   const items=cart.map(l=>({id:l.id,name:l.name,price:l.price,qty:l.qty,note:l.note||"",station:l.station}));
   return w(async db=>{
     const ref=db.collection("deliveries").doc();
     await ref.set({name:f.name,phone:f.phone,address:f.address,barrio:f.barrio||"",notes:f.notes||"",channel:f.channel||"WhatsApp",pay:f.pay||"Efectivo",cashFor:f.when==="ahora"?0:parseEur(f.cashFor),
-      prepaid:f.when==="ahora",payVerified:false,
+      prepaid:f.when==="ahora",payVerified:false,phoneKey:custKey(f.phone),
       items,subtotal:sub,fee,total:r2(sub+fee),status:"recibido",createdAt:now,paid:false,source,
       log:[{at:now,what:"Pedido recibido por "+(f.channel||"WhatsApp")+(f.when==="ahora"?" · pago por adelantado con "+f.pay:" · paga al recibir con "+f.pay)}]});
     const groups={}; items.forEach(i=>{ (groups[i.station]=groups[i.station]||[]).push({id:i.id,name:i.name,price:i.price,qty:i.qty,note:i.note}); });
     for(const st of Object.keys(groups)) await db.collection("orders").add({table:-1,label:"Domicilio · "+first,delivery:ref.id,station:st,items:groups[st],status:"nuevo",createdAt:now,paid:false,source:"domicilio"});
+    await upsertCustomer(db,f,items,r2(sub+fee),ref.id,now,1);
   });
 }
 async function dispatch(d){
@@ -772,6 +978,7 @@ async function cancelDelivery(d){
   const ok=await w(async db=>{
     await db.doc("deliveries/"+d.id).update({status:"cancelado",paid:true,cancelledAt:now,log:logAdd(d,"Cancelado")});
     for(const o of os) await db.doc("orders/"+o.id).update({status:"cancelado",paid:true});
+    if(custOf(d.phone)) await upsertCustomer(db,{phone:d.phone,consent:null},d.items||[],d.total||0,d.id,now,-1);
   },"Pedido cancelado");
   if(ok){ S.cancelDl=null; render(); }
 }
@@ -802,16 +1009,17 @@ function render(){
     const kitchen = S.orders.filter(o=>o.status==="nuevo").length;
     const open = new Set(S.orders.filter(o=>+o.table>=0).map(o=>+o.table)).size;
     const dls = S.deliveries.length;
-    const nav = [["hoy","Hoy","hoy",0],["grp","Servicio"],["mesero","Salón","mesas",alerts],["domicilios","Domicilios","moto",dls],["cocina","Cocina","cocina",kitchen],["caja","Caja","caja",open],["grp","Gestión"],["cliente","Menús","cliente",0],["ajustes","Ajustes","ajustes",0]];
+    const nav = [["hoy","Resumen","hoy",0],["domicilios","Domicilios","moto",dls],["cocina","Cocina","cocina",kitchen],["grp","Local"],["mesero","Salón","mesas",alerts],["caja","Caja","caja",open],["grp","Gestión"],["cliente","Menús","cliente",0],["ajustes","Ajustes","ajustes",0]];
     const liveCls = S.dbState==="ok"?"":"off", liveTxt = S.dbState==="ok"?"Sincronizado en vivo":S.dbState==="loading"?"Conectando…":"Sin conexión";
     let body = (S.dbState!=="ok" && S.dbState!=="loading" && S.view!=="cliente") ? offNote() : "";
-    body += S.view==="cliente"?vPreview():S.view==="cocina"?vCocina():S.view==="caja"?vCaja():S.view==="ajustes"?vAjustes():S.view==="domicilios"?vDomicilios():S.view==="hoy"?vHoy():vMesero();
-    html = `<div class="mtop"><b>Hecho en mi Pueblo</b><span class="live ${liveCls}" style="font-size:12px"><i></i></span></div>
+    body += S.view==="cliente"?vMenus():S.view==="cocina"?vCocina():S.view==="caja"?vCaja():S.view==="ajustes"?vAjustes():S.view==="domicilios"?vDomicilios():S.view==="hoy"?vHoy():vMesero();
+    const curT=THEMES.find(t=>t[0]===S.theme)||THEMES[1], nextT=THEMES[(THEMES.indexOf(curT)+1)%3];
+    html = `<div class="mtop"><b>Hecho en mi Pueblo</b><button class="tbtn" data-act="theme" data-v="${nextT[0]}" aria-label="Apariencia: ${curT[1]}. Cambiar a ${nextT[1]}">${ic(curT[2])}<span>${curT[1]}</span></button><span class="live ${liveCls}" style="font-size:12px"><i></i></span></div>
     <div class="app"><aside class="side">
       <div class="logo"><b>HECHO EN MI<span>PUEBLO</span></b><small>Antojos colombianos · Cafetería</small></div>
       <div class="tricolor"></div>
       <nav class="nav" aria-label="Secciones">${nav.map(([v,l,i,n])=>v==="grp"?`<div class="grp">${l}</div>`:`<button data-go="${v}" ${S.view===v?'aria-current="page"':""}>${ic(i)}<span>${l}</span>${n?`<span class="cnt num">${n}</span>`:""}</button>`).join("")}</nav>
-      <div class="side-foot"><span class="live ${liveCls}"><i></i>${liveTxt}</span><span class="mono" id="clk">${clock()}</span>${HOST&&S.user?`<span style="word-break:break-all">${esc(S.user.email||"")}</span><button class="btn sm ghost" style="color:inherit;justify-content:flex-start;padding-left:0" data-act="logout">Cerrar sesión</button>`:""}</div>
+      <div class="side-foot">${themeSw()}<span class="live ${liveCls}"><i></i>${liveTxt}</span><span class="mono" id="clk">${clock()}</span>${HOST&&S.user?`<span style="word-break:break-all">${esc(S.user.email||"")}</span><button class="btn sm ghost" style="color:inherit;justify-content:flex-start;padding-left:0" data-act="logout">Cerrar sesión</button>`:""}</div>
     </aside><main class="content">${body}</main></div>`;
   }
   document.title = S.customer ? (S.delivery ? "Pide a domicilio · Hecho en mi Pueblo" : "Menú · Hecho en mi Pueblo Cafetería") : "Hecho en mi Pueblo · Servicio";
@@ -849,7 +1057,7 @@ function vCliente(){
   const info = dom ? {os:[]} : tableInfo(t);
   const count=S.cart.reduce((a,l)=>a+l.qty,0), total=lineTotal(S.cart);
   const q=S.q.trim().toLowerCase();
-  const list=menu().filter(m=>!q || (m.name+" "+m.desc+" "+m.cat).toLowerCase().includes(q));
+  const CH=dom?"dom":"local", list=chMenu(CH).filter(m=>!q || (m.name+" "+m.desc+" "+m.cat).toLowerCase().includes(q));
   let h = dom
     ? `<header class="ghero dom"><div class="top"><div><h1>HECHO EN MI<span>PUEBLO</span></h1><div class="tagline">Antojos colombianos</div></div>
         <div class="mesa"><small>Pedido</small><b style="font-size:20px">A domicilio</b></div></div>
@@ -872,13 +1080,19 @@ function vCliente(){
       <div class="o"><div class="row" style="justify-content:space-between"><span style="font-size:13.5px">${itemsLine(o.items)}</span><span class="pill ${o.status==="listo"?"s-listo":o.status==="entregado"?"s-comiendo":"s-cocina"}">${STATUS[o.status]||""}</span></div>
       <div class="steps">${[1,2,3,4].map(n=>`<div class="${STEP[o.status]>=n?"on":""}"></div>`).join("")}</div></div>`).join("")}</div>`;
   }
+  const pr=dom&&activePromo(), pm=pr&&item(pr.dishId);
+  if(pm && inMenu(pm,"dom") && pm.available!==false){
+    const nIn=S.cart.filter(l=>l.id===pm.id).reduce((a,l)=>a+l.qty,0), was=pm.domPrice?+pm.domPrice:pm.price;
+    h += `<div class="promo"><div class="tx"><small>Promo de hoy</small><b>${esc(pm.name)}</b>${pm.desc?`<span style="font-size:13px;opacity:.85">${esc(pm.desc)}</span>`:""}<div class="pr num">${money(priceFor(pm,"dom"))}${pr.price?`<s>${money(was)}</s>`:""}</div></div>
+      ${nIn?`<b class="num" style="font-size:18px">${nIn} en tu pedido</b>`:`<button class="addb" data-act="add" data-id="${pm.id}" aria-label="Agregar ${esc(pm.name)}">${ic("plus")}</button>`}</div>`;
+  }
   h += `<div class="gsticky"><div class="search">${ic("search")}<input type="search" id="q" data-bind="q" placeholder="Buscar en el menú" value="${esc(S.q)}" aria-label="Buscar en el menú"></div>
-    <div class="gcats">${cats().map(c=>`<a href="#c-${slug(c)}" data-act="jump" data-cat="${slug(c)}">${esc(c)}</a>`).join("")}</div></div>`;
-  cats().forEach(c=>{
+    <div class="gcats">${cats(CH).map(c=>`<a href="#c-${slug(c)}" data-act="jump" data-cat="${slug(c)}">${esc(c)}</a>`).join("")}</div></div>`;
+  cats(CH).forEach(c=>{
     const its=list.filter(m=>m.cat===c); if(!its.length) return;
     h += `<section class="gsec" id="c-${slug(c)}"><h2>${esc(c)}</h2>${its.map(m=>{
       const n=S.cart.filter(l=>l.id===m.id).reduce((a,l)=>a+l.qty,0);
-      return `<div class="gitem ${m.available===false?"off":""}"><div class="tx"><div class="nm">${esc(m.name)}</div>${m.desc?`<div class="ds">${esc(m.desc)}</div>`:""}<div class="pr num">${money(m.price)}</div></div>
+      return `<div class="gitem ${m.available===false?"off":""}"><div class="tx"><div class="nm">${esc(m.name)}</div>${m.desc?`<div class="ds">${esc(m.desc)}</div>`:""}<div class="pr num">${money(priceFor(m,CH))}</div></div>
         ${m.available===false?`<span class="soldout">Agotado</span>`:n?`<div class="qty"><button data-act="dec" data-id="${m.id}" aria-label="Quitar uno">−</button><b class="num">${n}</b><button data-act="add" data-id="${m.id}" aria-label="Agregar otro">+</button></div>`
         :`<button class="addb" data-act="add" data-id="${m.id}" aria-label="Agregar ${esc(m.name)}">${ic("plus")}</button>`}</div>`;}).join("")}</section>`;
   });
@@ -899,6 +1113,7 @@ function vCliente(){
           <label class="f full">Dirección (calle, número, piso)<input type="text" id="gAddr" data-gform="address" value="${esc(g.address)}" autocomplete="street-address"></label>
           <label class="f">Barrio o código postal<input type="text" id="gBarrio" data-gform="barrio" value="${esc(g.barrio)}"></label>
           <label class="f">Notas para el repartidor<input type="text" id="gNotes" data-gform="notes" value="${esc(g.notes)}" placeholder="Timbre, portal…"></label>
+          <label class="row full" style="gap:10px;font-size:13.5px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" id="gConsent" data-act="gConsent" ${g.consent?"checked":""} style="margin-top:3px;width:16px;height:16px;flex:none"><span>Quiero recibir promociones de Hecho en mi Pueblo por WhatsApp. Puedo darme de baja cuando quiera.</span></label>
         </div>
         ${payBlock(g, total+feeOf())}
         ${live?`<button class="btn pri big" data-act="gsendLive">Confirmar pedido</button>`
@@ -928,11 +1143,32 @@ function payBlock(g,tot){
       : `<p class="muted" style="margin:0;font-size:13px">${g.pay.startsWith("Tarjeta")?"El repartidor lleva datáfono.":"Pagas por Bizum al repartidor cuando llegue."}</p>`}
   </div>`;
 }
-function vPreview(){
-  return head("Menús","Así ven el menú tus clientes: en la mesa (QR de la cafetería) o a domicilio (link de WhatsApp).",
-    `<div class="row"><div class="seg" role="group" aria-label="Menú">${[["mesa","Mesa"],["dom","Domicilio"]].map(([v,l])=>`<button data-act="prevMode" data-v="${v}" aria-pressed="${S.previewMode===v}">${l}</button>`).join("")}</div>
-     ${S.previewMode==="mesa"?`<select id="prevTable" data-act="prevTable" style="width:auto" aria-label="Mesa">${Array.from({length:+S.config.tables||10},(_,i)=>`<option value="${i+1}" ${S.table===i+1?"selected":""}>Mesa ${i+1}</option>`).join("")}</select>`:""}</div>`)
-    + `<div class="phone"><div class="guest ${S.delivery?"dom":"mesa"}">${vCliente()}</div></div>`;
+function vMenus(){
+  const dom=S.menuTab==="dom", ch=dom?"dom":"local";
+  // la vista previa usa el mismo menú que verán los clientes
+  S.delivery=dom; S.table=dom?-1:1;
+  const all=menu(), inN=all.filter(m=>inMenu(m,ch)).length, soldOut=all.filter(m=>inMenu(m,ch)&&m.available===false).length;
+  const tabs=`<div class="seg" role="group" aria-label="Menú">${[["dom","A domicilio"],["local","En el local"]].map(([v,l])=>`<button data-act="menuTab" data-v="${v}" aria-pressed="${S.menuTab===v}">${l}</button>`).join("")}</div>`;
+  let h=head("Menús", dom?"El menú que ven los clientes al pedir a domicilio por WhatsApp.":"Un solo menú para todas las mesas: lo que cambies aquí se ve en todos los QR.", tabs);
+  h+=`<div class="split"><div class="card"><div class="card-h"><h3>${dom?"Menú a domicilio":"Menú del local"}</h3><span class="muted" style="font-size:13px">${inN} producto${inN===1?"":"s"}${soldOut?` · ${soldOut} agotado${soldOut>1?"s":""}`:""}</span></div>
+    <div class="tablewrap"><table class="t"><thead><tr><th>Producto</th><th>${dom?"Se ofrece":"En el menú"}</th><th>${dom?"Precio a domicilio":"Precio"}</th>${dom?"":"<th>Sale por</th>"}<th>Hay</th></tr></thead><tbody>
+    ${all.map(m=>{ const on=inMenu(m,ch); return `<tr style="${on?"":"opacity:.55"}"><td><b>${esc(m.name)}</b><div class="muted" style="font-size:12px">${esc(m.cat)}</div></td>
+      <td><label class="switch"><input type="checkbox" id="in-${ch}-${m.id}" data-mfield="${ch}" data-id="${m.id}" ${on?"checked":""} aria-label="${esc(m.name)} en el menú ${dom?"a domicilio":"del local"}"><span></span></label></td>
+      <td>${dom?`<input type="number" id="dp-${m.id}" data-mfield="domPrice" data-id="${m.id}" value="${m.domPrice!=null&&m.domPrice!==""?m.domPrice:""}" placeholder="${m.price}" step="0.1" min="0" class="num" ${on?"":"disabled"} aria-label="Precio a domicilio de ${esc(m.name)}">`
+        :`<input type="number" id="pr-${m.id}" data-mfield="price" data-id="${m.id}" value="${m.price}" step="0.1" min="0" class="num" aria-label="Precio de ${esc(m.name)}">`}</td>
+      ${dom?"":`<td><select id="st-${m.id}" data-mfield="station" data-id="${m.id}" aria-label="Estación"><option value="cocina" ${m.station==="cocina"?"selected":""}>Cocina</option><option value="barra" ${m.station==="barra"?"selected":""}>Barra</option></select></td>`}
+      <td><label class="switch"><input type="checkbox" id="av-${ch}-${m.id}" data-mfield="available" data-id="${m.id}" ${m.available!==false?"checked":""} aria-label="${esc(m.name)} disponible"><span></span></label></td></tr>`; }).join("")}
+    </tbody></table></div>
+    <div class="card-b stack" style="border-top:1px solid var(--line)">
+      <p class="muted" style="margin:0;font-size:12.5px">${dom?"Si dejas el precio a domicilio vacío, se usa el mismo del local. «Hay» es compartido: si se agota, se agota en los dos menús.":"«Sale por» indica a qué pantalla llega la comanda: cocina o barra."}</p>
+      <span class="label">Agregar producto</span>
+      <div class="row"><input type="text" id="nName" placeholder="Nombre" style="flex:2 1 160px"><input type="text" id="nCat" placeholder="Categoría" list="catlist" style="flex:1 1 120px"><datalist id="catlist">${cats().map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+      <div class="row"><input type="number" id="nPrice" placeholder="Precio €" step="0.1" style="flex:1 1 100px"><select id="nSt" style="flex:1 1 100px" aria-label="Estación"><option value="cocina">Cocina</option><option value="barra">Barra</option></select></div>
+      <div class="row" style="gap:16px"><label class="row" style="gap:8px;font-size:13.5px"><input type="checkbox" id="nDom" checked> A domicilio</label><label class="row" style="gap:8px;font-size:13.5px"><input type="checkbox" id="nLocal" checked> En el local</label><button class="btn pri" data-act="addItem" style="margin-left:auto">${ic("plus")}Agregar</button></div>
+    </div></div>
+    <div class="stack"><span class="label">Así lo ve el cliente</span><div class="phone"><div class="guest ${dom?"dom":"mesa"}">${vCliente()}</div></div></div>
+  </div>`;
+  return h;
 }
 
 /* ----- Hoy: resumen del día y cierre ----- */
@@ -947,7 +1183,7 @@ function daySummary(){
   const domOrders=allDl.filter(d=>d.status!=="cancelado").length, cancelled=allDl.filter(d=>d.status==="cancelado").length;
   const byMethod={Efectivo:0,Tarjeta:0,Bizum:0,Transferencia:0}; pays.forEach(p=>{ const g=payGroup(p.method); byMethod[g]=r2(byMethod[g]+p.total); });
   const prod={}; live.forEach(o=>o.items.forEach(i=>{ prod[i.name]=(prod[i.name]||0)+i.qty; }));
-  const top=Object.entries(prod).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const topAll=Object.entries(prod).sort((a,b)=>b[1]-a[1]), top=topAll.slice(0,6);
   const hours=[]; for(let h=8;h<=22;h++) hours.push(h);
   const tickets={}; live.forEach(o=>{ const k=(o.delivery||o.table+"|"+o.createdAt); if(!tickets[k]) tickets[k]=o.createdAt; });
   const perH=hours.map(h=>Object.values(tickets).filter(ts=>new Date(ts).getHours()===h).length);
@@ -957,9 +1193,10 @@ function daySummary(){
   const openTables=[0,...Array.from({length:N},(_,i)=>i+1)].map(t=>tableInfo(t)).filter(x=>x.os.length);
   const pending=r2(openTables.reduce((a,x)=>a+x.total,0)+S.deliveries.filter(d=>d.status!=="cancelado"&&!d.prepaid).reduce((a,d)=>a+d.total,0));
   return {sales,tips,salaSales:r2(salaPays.reduce((a,p)=>a+p.total,0)),domSales:r2(domPays.reduce((a,p)=>a+p.total,0)),payCount:pays.length,
-    orders:salaTickets+domOrders,salaTickets,domOrders,cancelled,byMethod,top,hours,perH,kitchenAvg,delivAvg,openTables,pending};
+    orders:salaTickets+domOrders,salaTickets,domOrders,cancelled,byMethod,top,topAll,hours,perH,kitchenAvg,delivAvg,openTables,pending};
 }
 function vHoy(){
+  if(S.period!=="hoy") return vPeriodo();
   const s=daySummary(), now=new Date();
   const inKitchen=S.orders.filter(o=>o.status==="nuevo"||o.status==="preparando").length;
   const toServe=S.orders.filter(o=>o.status==="listo"&&+o.table>=0).length;
@@ -968,13 +1205,13 @@ function vHoy(){
   const peakI=s.perH.indexOf(Math.max(...s.perH)), maxH=Math.max(1,...s.perH);
   const mMax=Math.max(1,...Object.values(s.byMethod)), pMax=s.top.length?s.top[0][1]:1;
   const greet=now.getHours()<12?"Buenos días":now.getHours()<20?"Buenas tardes":"Buenas noches";
-  let h = head(`${greet}`, now.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})+" · así va el día en Hecho en mi Pueblo");
+  let h = head(`${greet}`, now.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})+" · así va el día en Hecho en mi Pueblo", periodSeg());
   h += `<div class="now">
-    ${[["cocina","En cocina",inKitchen,"cocina",inKitchen>0],["mesas","Para servir",toServe,"mesero",toServe>0],["mesas","Mesas ocupadas",s.openTables.filter(x=>true).length,"mesero",false],["moto","Domicilios por salir",S.deliveries.filter(d=>d.status!=="cancelado"&&d.status!=="en camino").length,"domicilios",false],["moto","Domicilios en camino",onRoad,"domicilios",false],["bell","Llamadas de mesa",S.calls.length,"mesero",S.calls.length>0],["receipt","Pagos por verificar",toVerify,"domicilios",toVerify>0]]
+    ${[["moto","Domicilios por salir",S.deliveries.filter(d=>d.status!=="cancelado"&&d.status!=="en camino").length,"domicilios",false],["moto","Domicilios en camino",onRoad,"domicilios",false],["receipt","Pagos por verificar",toVerify,"domicilios",toVerify>0],["cocina","En cocina",inKitchen,"cocina",inKitchen>0],["mesas","Para servir",toServe,"mesero",toServe>0],["mesas","Mesas ocupadas",s.openTables.length,"mesero",false],["bell","Llamadas de mesa",S.calls.length,"mesero",S.calls.length>0]]
       .map(([i,l,n,v,hot])=>`<button data-go="${v}"><span class="ic ${hot?"hot":""}">${ic(i)}</span><span><b class="num">${n}</b><span class="l">${l}</span></span></button>`).join("")}
   </div>
   <div class="hero">
-    <div class="kpi"><div class="label">Pedidos de hoy</div><div class="v num">${s.orders}</div><div class="d">${s.salaTickets} en local · ${s.domOrders} a domicilio${s.cancelled?` · ${s.cancelled} cancelado${s.cancelled>1?"s":""}`:""}</div></div>
+    <div class="kpi"><div class="label">Pedidos de hoy</div><div class="v num">${s.orders}</div><div class="d">${s.domOrders} a domicilio · ${s.salaTickets} en local${s.cancelled?` · ${s.cancelled} cancelado${s.cancelled>1?"s":""}`:""}</div></div>
     <div class="kpi"><div class="label">Vendido (cobrado)</div><div class="v num">${money(s.sales)}</div><div class="d">${s.payCount} cobro${s.payCount===1?"":"s"}${s.tips?` · ${money(s.tips)} propinas`:""}</div></div>
     <div class="kpi"><div class="label">Ticket medio</div><div class="v num">${money(s.payCount?s.sales/s.payCount:0)}</div><div class="d">por cobro</div></div>
     <div class="kpi"><div class="label">Por cobrar ahora</div><div class="v num">${money(s.pending)}</div><div class="d">${s.openTables.length} mesa${s.openTables.length===1?"":"s"} y domicilios sin pagar</div></div>
@@ -998,6 +1235,160 @@ function vHoy(){
       <div class="hbars">${Object.entries(s.byMethod).map(([m,v])=>`<div class="hb"><span class="nm">${m}</span><span class="tr"><i style="width:${v/mMax*100}%"></i></span><span class="v num">${money(v)}</span></div>`).join("")}</div></div></div>
   </div>
   ${vCierre(s)}`;
+  return h;
+}
+/* ----- Panel por semana, mes o fechas (a partir de los cierres de cada día) ----- */
+const periodSeg = () => `<div class="seg" role="group" aria-label="Periodo">${[["hoy","Hoy"],["semana","Semana"],["mes","Mes"],["rango","Fechas"]].map(([v,l])=>`<button data-act="period" data-v="${v}" aria-pressed="${S.period===v}">${l}</button>`).join("")}</div>`;
+const WD = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+const parseDay = s => { const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||""); return m?new Date(+m[1],+m[2]-1,+m[3]):null; };
+function periodRange(kind,off){
+  const t=new Date(); t.setHours(0,0,0,0);
+  let a,b;
+  if(kind==="semana"){ a=new Date(t); a.setDate(t.getDate()-((t.getDay()+6)%7)+7*off); b=new Date(a); b.setDate(a.getDate()+6); }
+  else if(kind==="mes"){ a=new Date(t.getFullYear(),t.getMonth()+off,1); b=new Date(t.getFullYear(),t.getMonth()+off+1,0); }
+  else {
+    a=parseDay(S.rFrom); b=parseDay(S.rTo);
+    if(!b) b=new Date(t); if(!a){ a=new Date(b); a.setDate(b.getDate()-6); }
+    if(a>b){ const x=a; a=b; b=x; }
+    const len=Math.round((b-a)/86400000)+1;
+    if(off){ a=new Date(a); a.setDate(a.getDate()+off*len); b=new Date(b); b.setDate(b.getDate()+off*len); }
+  }
+  const days=[]; for(let d=new Date(a); d<=b && days.length<400; d.setDate(d.getDate()+1)) days.push(new Date(d));
+  return {a,b,days,today:t,cur:a<=t&&b>=t};
+}
+function dayRecords(){
+  const m={}; S.closings.forEach(c=>m[c.id||c.date]=c);
+  const k=dayKey();
+  if(!m[k]){ const s=daySummary(); if(s.orders||s.sales) m[k]={date:k,live:true,orders:s.orders,salaTickets:s.salaTickets,domOrders:s.domOrders,sales:s.sales,salaSales:s.salaSales,domSales:s.domSales,
+    tips:s.tips,payCount:s.payCount,byMethod:s.byMethod,perH:s.perH,kitchenAvg:s.kitchenAvg,delivAvg:s.delivAvg,top:s.topAll.map(([name,qty])=>({name,qty}))}; }
+  return m;
+}
+function aggregate(recs){
+  const A={sales:0,orders:0,payCount:0,tips:0,salaSales:0,domSales:0,salaTickets:0,domOrders:0,byMethod:{Efectivo:0,Tarjeta:0,Bizum:0,Transferencia:0},prod:{},kt:[],dt:[],diff:0,diffDays:0,n:recs.length};
+  recs.forEach(r=>{ A.sales+=r.sales||0; A.orders+=r.orders||0; A.payCount+=r.payCount||r.orders||0; A.tips+=r.tips||0; A.salaSales+=r.salaSales||0; A.domSales+=r.domSales||0;
+    A.salaTickets+=r.salaTickets||0; A.domOrders+=r.domOrders||0;
+    Object.entries(r.byMethod||{}).forEach(([k,v])=>A.byMethod[k]=(A.byMethod[k]||0)+(v||0));
+    (r.top||[]).forEach(x=>A.prod[x.name]=(A.prod[x.name]||0)+x.qty);
+    if(r.kitchenAvg!=null) A.kt.push(r.kitchenAvg); if(r.delivAvg!=null) A.dt.push(r.delivAvg);
+    if(r.diff!=null && !r.live){ A.diff+=r.diff; if(Math.abs(r.diff)>=0.01) A.diffDays++; } });
+  A.avgTicket=A.payCount?A.sales/A.payCount:0; A.perDay=A.n?A.sales/A.n:0;
+  const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null; A.kitchenAvg=avg(A.kt); A.delivAvg=avg(A.dt);
+  return A;
+}
+function delta(cur,prev,label){
+  if(prev===null) return `<div class="d">Sin histórico completo para comparar</div>`;
+  if(!prev) return `<div class="d">Sin datos ${label}</div>`;
+  const p=(cur-prev)/prev*100, up=p>=0.5, dn=p<=-0.5;
+  return `<div class="d"><span class="dl ${up?"up":dn?"dn":""}">${up?"▲":dn?"▼":"="} ${Math.abs(p).toLocaleString("es-ES",{maximumFractionDigits:0})} %</span> ${label}</div>`;
+}
+function vPeriodo(){
+  const kind=S.period, R=periodRange(kind,S.pOff), P=periodRange(kind,S.pOff-1), M=dayRecords();
+  const inRange=R.days.filter(d=>d<=R.today), span=inRange.length, len=R.days.length;
+  const recs=inRange.map(d=>M[dayKey(d)]).filter(Boolean);
+  const A=aggregate(recs);
+  const closedRecs=recs.filter(r=>!r.live), cmpN=inRange.filter(d=>{ const r=M[dayKey(d)]; return !(r&&r.live); }).length;
+  const Ac=aggregate(closedRecs), Bc=aggregate(P.days.slice(0,R.cur?cmpN:P.days.length).map(d=>M[dayKey(d)]).filter(Boolean));
+  const fmtD=d=>d.toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+  const fmtY=d=>d.toLocaleDateString("es-ES",{day:"numeric",month:"short",year:"numeric"});
+  const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
+  const title = kind==="semana" ? (S.pOff===0?"Esta semana":S.pOff===-1?"Semana pasada":`Semana del ${fmtD(R.a)}`)
+    : kind==="mes" ? cap(R.a.toLocaleDateString("es-ES",{month:"long",year:"numeric"}))
+    : (len===1?cap(R.a.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"})):`Del ${R.a.getFullYear()===R.b.getFullYear()?fmtD(R.a):fmtY(R.a)} al ${fmtY(R.b)}`);
+  const vs = (kind==="semana" ? "vs. semana anterior" : kind==="mes" ? "vs. mes anterior" : `vs. ${len===1?"el día anterior":"los "+len+" días anteriores"}`)+(R.cur?" (días cerrados)":"");
+  const sub = `${fmtD(R.a)} – ${fmtD(R.b)} · ${recs.length} día${recs.length===1?"":"s"} con ventas${R.cur&&M[dayKey()]&&M[dayKey()].live?" · hoy incluido en vivo":""}`;
+  const quick = kind==="rango" ? `<div class="drange"><label for="pFrom">Desde</label><input type="date" id="pFrom" data-act="pFrom" value="${dayKey(R.a)}" max="${dayKey()}">
+      <label for="pTo">hasta</label><input type="date" id="pTo" data-act="pTo" value="${dayKey(R.b)}" max="${dayKey()}"></div>
+      <div class="quick">${[[7,"7 días"],[30,"30 días"],[90,"90 días"],["y","Este año"]].map(([v,l])=>`<button class="btn sm" data-act="pQuick" data-v="${v}">${l}</button>`).join("")}</div>` : "";
+  const nav = `<div class="row" style="gap:8px;justify-content:flex-end"><div class="row" style="gap:4px"><button class="btn sm" data-act="pNav" data-v="-1" aria-label="Periodo anterior">‹</button><button class="btn sm" data-act="pNav" data-v="1" aria-label="Periodo siguiente" ${R.cur||R.b>=R.today?"disabled":""}>›</button></div>${periodSeg()}</div>`;
+  let h = head(title, sub, `<div class="stack" style="gap:8px;align-items:flex-end">${nav}${quick?`<div class="row" style="gap:10px;justify-content:flex-end">${quick}</div>`:""}</div>`);
+  if(!recs.length) return h + `<div class="card"><div class="empty">No hay cierres guardados en este periodo. Los datos aparecen aquí cada vez que se cierra el día.</div></div>`;
+
+  const fair = Bc.n===0 || Bc.n >= Ac.n*0.8, cmp = k => fair ? Bc[k] : null; // si el periodo anterior tiene pocos días, no se compara
+  h += `<div class="hero">
+    <div class="kpi"><div class="label">Ventas</div><div class="v num">${money(A.sales)}</div>${delta(Ac.sales,cmp("sales"),vs)}</div>
+    <div class="kpi"><div class="label">Pedidos</div><div class="v num">${A.orders.toLocaleString("es-ES")}</div>${delta(Ac.orders,cmp("orders"),vs)}</div>
+    <div class="kpi"><div class="label">Ticket medio</div><div class="v num">${money(A.avgTicket)}</div>${delta(Ac.avgTicket,cmp("avgTicket"),vs)}</div>
+    <div class="kpi"><div class="label">Media por día</div><div class="v num">${money(A.perDay)}</div>${delta(Ac.perDay,cmp("perDay"),vs)}</div>
+  </div>`;
+
+  // Ventas por día (o por semana si el rango es largo), local + domicilio apilado
+  const unit = len>62 ? 7 : 1, wide = len<=10;
+  const cols=[]; for(let i=0;i<len;i+=unit){
+    const ds=R.days.slice(i,i+unit), rs=ds.map(d=>M[dayKey(d)]).filter(Boolean);
+    cols.push({d:ds[0],d2:ds[ds.length-1],rs,has:rs.length>0,live:rs.some(r=>r.live),fut:ds[0]>R.today,
+      sala:rs.reduce((a,r)=>a+(r.salaSales||0),0),dom:rs.reduce((a,r)=>a+(r.domSales||0),0),tot:rs.reduce((a,r)=>a+(r.sales||0),0),ord:rs.reduce((a,r)=>a+(r.orders||0),0)});
+  }
+  const maxV=Math.max(1,...cols.map(c=>c.tot)), best=cols.reduce((a,c)=>c.tot>(a?a.tot:0)?c:a,null);
+  const full=cols.filter(c=>c.has&&!c.live&&c.tot>0), worst=full.reduce((a,c)=>!a||c.tot<a.tot?c:a,null);
+  const step=maxV>8000?2000:maxV>4000?1000:maxV>2000?500:maxV>800?200:maxV>300?100:50, top=Math.ceil(maxV/step)*step, ticks=[]; for(let v=0; v<=top; v+=step) ticks.push(v);
+  const lbl=(c,i)=> wide ? `${WD[(c.d.getDay()+6)%7]} ${c.d.getDate()}`
+    : unit===7 ? ((i===0||c.d.getMonth()!==cols[i-1].d.getMonth())?c.d.toLocaleDateString("es-ES",{month:"short"}):"")
+    : ((c.d.getDate()===1||c.d.getDate()%5===0)?c.d.getDate():"");
+  const dayName=d=>d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+  const colName=c=>unit===7?`Semana del ${fmtD(c.d)} al ${fmtD(c.d2)}`:dayName(c.d);
+  const short=c=>unit===7?`sem. ${fmtD(c.d)}`:c.d.toLocaleDateString("es-ES",{weekday:"short",day:"numeric"});
+  h += `<div class="card" style="margin-bottom:20px"><div class="card-h"><h3>Ventas por ${unit===7?"semana":"día"}</h3>
+      <div class="lgd"><span><i class="sw c1"></i>En local <b class="num">${money(A.salaSales)}</b></span><span><i class="sw c2"></i>A domicilio <b class="num">${money(A.domSales)}</b></span></div></div>
+    <div class="card-b"><div class="dchart ${wide?"wide":""}">
+      <div class="yax">${ticks.slice().reverse().map(v=>`<span>${v.toLocaleString("es-ES")} €</span>`).join("")}</div>
+      <div class="plot"><div class="grid">${ticks.map(()=>"<i></i>").join("")}</div>
+        <div class="dbars">${cols.map(c=>`<div class="dcol ${c.fut?"fut":""}" tabindex="${c.has?0:-1}">
+          ${c.has?`<span class="ptip"><b>${colName(c)}</b><br>Total ${money(c.tot)}<br>En local ${money(c.sala)} · Domicilio ${money(c.dom)}<br>${c.ord} pedidos${c.live?" · en curso":""}</span>`:""}
+          ${c===best&&wide?`<span class="val num" style="bottom:calc(${c.tot/top*100}% + 4px)">${money(c.tot)}</span>`:""}
+          <div class="stk" style="height:${c.tot/top*100}%"><i class="c2" style="flex:${c.dom}"></i><i class="c1" style="flex:${c.sala}"></i></div></div>`).join("")}</div>
+        <div class="xax">${cols.map((c,i)=>`<span>${lbl(c,i)}</span>`).join("")}</div></div>
+    </div></div>
+    <div class="facts">
+      <div><span class="label">Mejor ${unit===7?"semana":"día"}</span><b class="cap">${best&&best.tot?short(best):"—"}</b><span class="muted num">${best?money(best.tot):""}</span></div>
+      <div><span class="label">${unit===7?"Semana más floja":"Día más flojo"}</span><b class="cap">${worst?short(worst):"—"}</b><span class="muted num">${worst?money(worst.tot):""}</span></div>
+      <div><span class="label">Tiempo en cocina</span><b class="num">${A.kitchenAvg!=null?A.kitchenAvg+" min":"—"}</b><span class="muted">de media</span></div>
+      <div><span class="label">Entrega a domicilio</span><b class="num">${A.delivAvg!=null?A.delivAvg+" min":"—"}</b><span class="muted">de media</span></div>
+      <div><span class="label">Propinas</span><b class="num">${money(A.tips)}</b><span class="muted">en total</span></div>
+      <div><span class="label">Caja</span><b class="num">${A.diffDays?(A.diff<0?"−":"+")+money(Math.abs(A.diff)):"Cuadra"}</b><span class="muted">${A.diffDays?A.diffDays+" día"+(A.diffDays>1?"s":"")+" con descuadre":"todos los días"}</span></div>
+    </div></div>`;
+
+  // Horas fuertes (día de la semana × hora)
+  const HRS=[]; for(let x=8;x<=22;x++) HRS.push(x);
+  const grid=WD.map(()=>HRS.map(()=>0)), cnt=WD.map(()=>0);
+  recs.forEach(r=>{ const d=parseDay(r.date||r.id); if(!d) return; const wd=(d.getDay()+6)%7; cnt[wd]++; (r.perH||[]).forEach((v,i)=>{ if(i<HRS.length) grid[wd][i]+=v||0; }); });
+  const avgG=grid.map((row,w)=>row.map(v=>cnt[w]?v/cnt[w]:0)), hMax=Math.max(0.01,...avgG.flat());
+  let pk={w:0,i:0}; avgG.forEach((row,w)=>row.forEach((v,i)=>{ if(v>avgG[pk.w][pk.i]) pk={w,i}; }));
+  const busiest=cnt.map((c,w)=>({w,v:c?avgG[w].reduce((a,b)=>a+b,0):0})).sort((a,b)=>b.v-a.v)[0];
+  h += `<div class="g2">
+    <div class="card"><div class="card-h"><h3>Horas fuertes</h3><span class="muted" style="font-size:13px">Pico: ${["lunes","martes","miércoles","jueves","viernes","sábados","domingos"][pk.w]} a las ${HRS[pk.i]}:00</span></div>
+      <div class="card-b"><div class="tablewrap" style="padding-top:44px;margin-top:-44px"><div class="heat" role="img" aria-label="Pedidos medios por día de la semana y hora">
+        <span></span>${HRS.map((x,i)=>`<span class="hx">${i%2?"":x}</span>`).join("")}
+        ${WD.map((n,w)=>`<span class="hy">${n}</span>${HRS.map((x,i)=>{ const v=avgG[w][i], k=v/hMax; return `<i tabindex="0" style="--k:${(k*100).toFixed(0)}%" class="${cnt[w]?"":"na"}"><span class="ptip">${n} ${x}:00 · ${cnt[w]?v.toLocaleString("es-ES",{maximumFractionDigits:1})+" pedidos de media":"sin datos"}</span></i>`; }).join("")}`).join("")}
+      </div></div>
+      <div class="heatkey"><span>Menos</span><i style="--k:5%"></i><i style="--k:30%"></i><i style="--k:55%"></i><i style="--k:80%"></i><i style="--k:100%"></i><span>Más pedidos</span><span class="muted" style="margin-left:auto">Día con más trabajo: <b style="color:var(--ink)">${["lunes","martes","miércoles","jueves","viernes","sábado","domingo"][busiest.w]}</b></span></div></div></div>`;
+
+  // Cómo se vende: canal y método
+  const salesT=A.sales||1, meth=Object.entries(A.byMethod).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const pct=v=>(v/salesT*100).toLocaleString("es-ES",{maximumFractionDigits:0})+" %";
+  h += `<div class="card"><div class="card-h"><h3>Cómo se vende</h3></div><div class="card-b stack" style="gap:18px">
+      <div class="stack" style="gap:8px"><div class="label">Canal</div>
+        <div class="sbar"><i class="c1" style="flex:${A.salaSales}"></i><i class="c2" style="flex:${A.domSales}"></i></div>
+        <div class="slist"><div><i class="sw c1"></i>En local<span class="num">${pct(A.salaSales)}</span><b class="num">${money(A.salaSales)}</b></div><div><i class="sw c2"></i>A domicilio<span class="num">${pct(A.domSales)}</span><b class="num">${money(A.domSales)}</b></div></div>
+        <div class="muted" style="font-size:12.5px">${A.salaTickets.toLocaleString("es-ES")} tiques en local · ${A.domOrders.toLocaleString("es-ES")} domicilios</div></div>
+      <div class="stack" style="gap:8px"><div class="label">Método de pago</div>
+        <div class="sbar">${meth.map(([m,v],i)=>`<i class="m${i}" style="flex:${v}"></i>`).join("")}</div>
+        <div class="slist">${meth.map(([m,v],i)=>`<div><i class="sw m${i}"></i>${m}<span class="num">${pct(v)}</span><b class="num">${money(v)}</b></div>`).join("")}</div></div>
+    </div></div>
+  </div>`;
+
+  // Lo más vendido + tabla de días
+  const prods=Object.entries(A.prod).sort((a,b)=>b[1]-a[1]).slice(0,8), pM=prods.length?prods[0][1]:1;
+  const priceOf=n=>{ const m=menu().find(x=>x.name===n); return m?m.price:0; };
+  h += `<div class="g2">
+    <div class="card"><div class="card-h"><h3>Lo más vendido</h3><span class="muted" style="font-size:13px">unidades · importe aprox.</span></div><div class="card-b">
+      ${prods.length?`<div class="hbars">${prods.map(([n,q],i)=>`<div class="hb rk"><span class="nm" title="${esc(n)}"><em class="num">${i+1}</em>${esc(n)}</span><span class="tr"><i style="width:${q/pM*100}%"></i></span><span class="v num">${q.toLocaleString("es-ES")}<small>${money(q*priceOf(n))}</small></span></div>`).join("")}</div>`:`<div class="empty">Sin productos en este periodo.</div>`}</div></div>
+    <div class="card"><div class="card-h"><h3>Día a día</h3><span class="muted" style="font-size:13px">${recs.length} día${recs.length===1?"":"s"}</span></div>
+      <div class="tablewrap" style="max-height:420px;overflow-y:auto"><table class="t"><thead><tr><th>Día</th><th>Pedidos</th><th>Ventas</th><th>Caja</th></tr></thead><tbody>
+      ${recs.slice().reverse().map(r=>{ const d=parseDay(r.date||r.id);
+        return `<tr><td style="white-space:nowrap;text-transform:capitalize">${d.toLocaleDateString("es-ES",len>31?{day:"numeric",month:"short"}:{weekday:"short",day:"numeric"})}</td><td class="num">${r.orders}</td><td class="num" style="font-weight:700">${money(r.sales)}</td>
+        <td>${r.live?`<span class="pill s-cocina">Abierto</span>`:r.diff==null?`<span class="muted">Sin contar</span>`:Math.abs(r.diff)<0.01?`<span class="pill s-listo">Cuadra</span>`:`<span class="pill ${Math.abs(r.diff)<=5?"s-camino":"s-cancelado"}">${r.diff>0?"Sobra":"Falta"} ${money(Math.abs(r.diff))}</span>`}</td></tr>`; }).join("")}
+      </tbody></table></div></div>
+  </div>`;
   return h;
 }
 function vCierre(s){
@@ -1027,7 +1418,7 @@ function vCierre(s){
         :`<button class="btn pri big" data-act="closeAsk">${ic("lock")}${done?"Volver a cerrar el día":"Cerrar el día"}</button>`}
     </div></div></div>
     ${S.closings.length?`<div class="tablewrap" style="border-top:1px solid var(--line)"><table class="t"><thead><tr><th>Día</th><th>Pedidos</th><th>Ventas</th><th>Efectivo</th><th>Tarjeta</th><th>Bizum</th><th>Caja</th><th>Notas</th></tr></thead><tbody>
-      ${S.closings.map(c=>`<tr><td class="mono">${esc(c.id)}</td><td class="num">${c.orders}</td><td class="num" style="font-weight:700">${money(c.sales)}</td><td class="num">${money(c.byMethod&&c.byMethod.Efectivo)}</td><td class="num">${money(c.byMethod&&c.byMethod.Tarjeta)}</td><td class="num">${money(c.byMethod&&c.byMethod.Bizum)}</td>
+      ${S.closings.slice(0,7).map(c=>`<tr><td class="mono">${esc(c.id)}</td><td class="num">${c.orders}</td><td class="num" style="font-weight:700">${money(c.sales)}</td><td class="num">${money(c.byMethod&&c.byMethod.Efectivo)}</td><td class="num">${money(c.byMethod&&c.byMethod.Tarjeta)}</td><td class="num">${money(c.byMethod&&c.byMethod.Bizum)}</td>
         <td>${c.diff==null?`<span class="muted">Sin contar</span>`:Math.abs(c.diff)<0.01?`<span class="pill s-listo">Cuadra</span>`:`<span class="pill ${Math.abs(c.diff)<=5?"s-camino":"s-cancelado"}">${c.diff>0?"Sobra":"Falta"} ${money(Math.abs(c.diff))}</span>`}</td><td class="muted" style="font-size:12.5px">${esc(c.notes||"")}</td></tr>`).join("")}</tbody></table></div>`:""}
   </div>`;
 }
@@ -1038,7 +1429,7 @@ async function saveClosing(){
   const ok=await w(db=>db.doc("closings/"+key).set({date:key,closedAt:Date.now(),orders:s.orders,salaTickets:s.salaTickets,domOrders:s.domOrders,cancelled:s.cancelled,
     sales:s.sales,salaSales:s.salaSales,domSales:s.domSales,tips:s.tips,byMethod:s.byMethod,payCount:s.payCount,
     cashFloat:float,cashExpected:expected,cashCounted:counted,diff:counted==null?null:r2(counted-expected),notes:S.cf.notes||"",
-    pendingAtClose:s.pending,top:s.top.map(([name,qty])=>({name,qty}))}),"Día cerrado y guardado");
+    pendingAtClose:s.pending,perH:s.perH,kitchenAvg:s.kitchenAvg,delivAvg:s.delivAvg,top:s.topAll.map(([name,qty])=>({name,qty}))}),"Día cerrado y guardado");
   if(ok){ S.confirmClose=false; render(); }
 }
 
@@ -1067,7 +1458,7 @@ function vMesero(){
     <div class="card"><div class="card-h"><h3>Pedido desde código QR</h3></div><div class="card-b stack"><p class="muted" style="margin:0;font-size:13.5px">Si el cliente generó un código en su móvil, escríbelo aquí.</p>
       <div class="row"><input type="text" id="codeIn" data-bind="codeIn" placeholder="M3-C1x2.A2" value="${esc(S.codeIn)}" style="flex:1;font-family:var(--f-mono)"><button class="btn pri" data-act="loadCode">Cargar</button></div></div></div>`;
   } else {
-    const t=S.selTable, f=tableInfo(t), st=S.staffCart, pc=S.pickCat||cats()[0];
+    const t=S.selTable, f=tableInfo(t), st=S.staffCart, pc=S.pickCat||cats("local")[0];
     h += `<div class="card"><div class="card-h"><div><h3 style="font-size:17px">${esc(tname(t))}</h3><span class="pill s-${f.state}" style="margin-top:4px">${f.label}</span></div>
       <div class="row"><button class="btn sm" data-act="toCaja" data-t="${t}" ${f.os.length?"":"disabled"}>${ic("caja")}Cobrar</button><button class="btn sm ghost" data-act="selTable" data-t="-99" aria-label="Cerrar">✕</button></div></div>
       <div class="card-b stack">
@@ -1076,7 +1467,7 @@ function vMesero(){
         <div class="row" style="justify-content:space-between;font-weight:700"><span>Consumo</span><span class="num">${money(f.total)}</span></div>`:`<p class="muted" style="margin:0">Mesa sin pedidos abiertos.</p>`}
       </div></div>
       <div class="card"><div class="card-h"><h3>Agregar al pedido</h3></div><div class="card-b stack">
-        ${pickerHtml(pc,"sadd","pickCat")}
+        ${pickerHtml(pc,"sadd","pickCat","local")}
         ${st.length?`<div>${cartLines(st,"s")}
           <div class="totline g"><span>Nuevo pedido</span><span class="v num">${money(lineTotal(st))}</span></div>
           <button class="btn pri big" data-act="ssend">Enviar a cocina y barra</button></div>`:`<p class="muted" style="margin:0;font-size:13px">Toca un producto para agregarlo. Cocina y barra reciben cada una lo suyo.</p>`}
@@ -1085,9 +1476,9 @@ function vMesero(){
   h += `</div></div>`;
   return h;
 }
-function pickerHtml(pc,act,catAct){
-  return `<div class="picker-tabs">${cats().map(c=>`<button data-act="${catAct}" data-c="${esc(c)}" aria-pressed="${pc===c}">${esc(c)}</button>`).join("")}</div>
-    <div class="picker">${menu().filter(m=>m.cat===pc).map(m=>`<button data-act="${act}" data-id="${m.id}" ${m.available===false?"disabled":""}>${esc(m.name)}<span class="num">${m.available===false?"Agotado":money(m.price)}</span></button>`).join("")}</div>`;
+function pickerHtml(pc,act,catAct,ch){
+  return `<div class="picker-tabs">${cats(ch).map(c=>`<button data-act="${catAct}" data-c="${esc(c)}" aria-pressed="${pc===c}">${esc(c)}</button>`).join("")}</div>
+    <div class="picker">${chMenu(ch).filter(m=>m.cat===pc).map(m=>`<button data-act="${act}" data-id="${m.id}" ${m.available===false?"disabled":""}>${esc(m.name)}<span class="num">${m.available===false?"Agotado":money(m.price)}</span></button>`).join("")}</div>`;
 }
 function cartLines(cart,p){
   return cart.map((l,i)=>`<div class="ln"><div><b>${esc(l.name)}</b> <span class="muted num">${money(l.price*l.qty)}</span></div>
@@ -1104,7 +1495,10 @@ function vDomicilios(){
   const t0=new Date(); t0.setHours(0,0,0,0);
   const reqToday=S.deliveries.concat(S.doneDeliveries).filter((d,i,a)=>a.findIndex(x=>x.id===d.id)===i && d.createdAt>=t0.getTime() && d.status!=="cancelado");
   const times=done.filter(d=>d.deliveredAt).map(d=>(d.deliveredAt-d.createdAt)/60000), avg=times.length?Math.round(times.reduce((a,b)=>a+b,0)/times.length):0;
-  let h = head("Domicilios",`${act.length} en curso · ${by.camino.length} en la calle`);
+  const dtabs=`<div class="seg" role="group" aria-label="Sección">${[["pedidos","Pedidos"],["clientes","Clientes"],["campanas","Campañas"]].map(([v,l])=>`<button data-act="dTab" data-v="${v}" aria-pressed="${S.dTab===v}">${l}${v==="pedidos"&&act.length?` <span class="num">${act.length}</span>`:v==="clientes"&&S.customers.length?` <span class="num">${S.customers.length}</span>`:""}</button>`).join("")}</div>`;
+  if(S.dTab==="clientes") return head("Clientes","Ficha de cada cliente con sus datos, pedidos habituales e historial. Se llena sola con cada domicilio.",dtabs)+vClientes();
+  if(S.dTab==="campanas") return head("Campañas","Promociona un plato por WhatsApp a tus clientes y muéstralo destacado en el menú a domicilio.",dtabs)+vCampanas();
+  let h = head("Domicilios",`${act.length} en curso · ${by.camino.length} en la calle`,dtabs);
   h += `<div class="kpis">
     <div class="kpi"><div class="label">Solicitados hoy</div><div class="v num">${reqToday.length}</div><div class="d">${act.length} en curso · ${by.cocina.length} en cocina · ${by.listo.length} por salir</div></div>
     <div class="kpi"><div class="label">Entregados hoy</div><div class="v num">${done.length}</div><div class="d">${S.doneDeliveries.filter(d=>d.status==="cancelado").length} cancelados</div></div>
@@ -1175,11 +1569,20 @@ function dCard(d,stage){
       ${d.phone?`<a class="btn sm" href="${esc(waTo(d.phone,statusMsg(d,stage)))}" target="_blank" rel="noopener">${ic("chat")}Avisar</a>`:""}</div>
     <div class="act">${actions}</div></article>`;
 }
+function knownBox(f){
+  const c=custOf(f.phone); if(!c) return "";
+  const hb=habitual(c);
+  return `<div class="known"><div class="row" style="justify-content:space-between;gap:8px"><b>${ic("check")} Cliente conocido: ${esc(c.name||"")}</b><button class="btn sm" data-act="custOpen" data-k="${c.id}">Ver ficha</button></div>
+    <span>${c.orders||0} pedido${c.orders===1?"":"s"} · último ${agoTxt(c.lastAt)} · ${money(c.spent||0)} en total${c.consent?" · acepta promociones":""}</span>
+    ${c.notes?`<span class="note" style="padding:6px 10px">${esc(c.notes)}</span>`:""}
+    ${hb.length?`<span>Suele pedir: <b>${hb.map(x=>`${x.qty}× ${esc(x.name)}`).join(", ")}</b></span><button class="btn sm pri" data-act="useHabit" data-k="${c.id}" style="align-self:flex-start">Usar sus datos y su pedido habitual</button>`:""}</div>`;
+}
 function dForm(){
-  const f=S.dForm, pc=S.dPick||cats()[0], sub=lineTotal(S.dCart);
+  const f=S.dForm, pc=S.dPick||cats("dom")[0], sub=lineTotal(S.dCart);
   return `<div class="card"><div class="card-h"><h3>Registrar pedido</h3><span class="muted" style="font-size:13px">WhatsApp, teléfono o apps</span></div><div class="card-b stack">
     <label class="f">Pega aquí el mensaje de WhatsApp del cliente<textarea id="dPaste" data-bind="dPaste" placeholder="Pedido a domicilio · Hecho en mi Pueblo&#10;2x Empanadas x3&#10;…&#10;Código: D-A1x2">${esc(S.dPaste)}</textarea></label>
     <button class="btn" data-act="readMsg" ${S.dPaste.trim()?"":"disabled"}>Leer mensaje y llenar el pedido</button>
+    ${knownBox(f)}
     <div class="fgrid">
       <label class="f">Nombre<input type="text" id="dName" data-dform="name" value="${esc(f.name)}"></label>
       <label class="f">Teléfono<input type="tel" id="dPhone" data-dform="phone" value="${esc(f.phone)}"></label>
@@ -1190,8 +1593,9 @@ function dForm(){
       <label class="f">Método<select id="dPay" data-dform="pay">${(f.when==="ahora"?["Bizum","Tarjeta online","Transferencia"]:DPAY).map(c=>`<option ${f.pay===c?"selected":""}>${c}</option>`).join("")}</select></label>
       ${f.when==="ahora"?`<span></span>`:`<label class="f">Paga con (efectivo)<input type="text" inputmode="decimal" id="dCash" data-dform="cashFor" value="${esc(f.cashFor)}" placeholder="€"></label>`}
       <label class="f full">Notas<input type="text" id="dNotes" data-dform="notes" value="${esc(f.notes)}" placeholder="Timbre, portal, alergias…"></label>
+      <label class="row full" style="gap:8px;font-size:13.5px"><input type="checkbox" id="dConsent" data-act="dConsent" ${f.consent?"checked":""}> Acepta recibir promociones por WhatsApp</label>
     </div>
-    ${pickerHtml(pc,"dadd","dPick")}
+    ${pickerHtml(pc,"dadd","dPick","dom")}
     ${S.dCart.length?`<div>${cartLines(S.dCart,"d")}
       <div class="totline num"><span class="muted">Productos</span><span>${money(sub)}</span></div><div class="totline num"><span class="muted">Envío</span><span>${money(feeOf())}</span></div>
       <div class="totline g"><span>Total</span><span class="v num">${money(sub+feeOf())}</span></div></div>`:""}
@@ -1213,6 +1617,157 @@ function waCard(){
       <li><span>Pega ese mensaje arriba y toca <b>Leer mensaje</b>. Queda registrado con hora, canal y pago.</span></li>
       <li><span>Usa <b>Avisar</b> en cada tarjeta para mandar al cliente el estado de su pedido.</span></li>
     </ol></div></div>`;
+}
+
+/* ----- Clientes ----- */
+function vClientes(){
+  const q=S.custQ.trim().toLowerCase(), all=S.customers;
+  const sorters={recent:(a,b)=>(b.lastAt||0)-(a.lastAt||0),orders:(a,b)=>(b.orders||0)-(a.orders||0),spent:(a,b)=>(b.spent||0)-(a.spent||0)};
+  const list=all.filter(c=>!q || [c.name,c.phone,c.barrio,c.address].join(" ").toLowerCase().includes(q)).sort(sorters[S.custSort||"recent"]);
+  const rep=all.filter(c=>(c.orders||0)>=2).length, cons=all.filter(c=>c.consent).length, inact=all.filter(c=>daysAgo(c.lastAt)>=30).length;
+  let h=`<div class="kpis">
+    <div class="kpi"><div class="label">Clientes</div><div class="v num">${all.length}</div><div class="d">con al menos un domicilio</div></div>
+    <div class="kpi"><div class="label">Repiten</div><div class="v num">${all.length?Math.round(rep/all.length*100):0} %</div><div class="d">${rep} con 2 pedidos o más</div></div>
+    <div class="kpi"><div class="label">Aceptan promociones</div><div class="v num">${cons}</div><div class="d">pueden recibir campañas</div></div>
+    <div class="kpi"><div class="label">Sin pedir hace +30 días</div><div class="v num">${inact}</div><div class="d">buenos para una campaña</div></div>
+  </div><div class="split"><div class="card"><div class="card-h"><div class="search" style="flex:1;min-width:180px">${ic("search")}<input type="search" id="custQ" data-bind="custQ" placeholder="Buscar por nombre, teléfono o barrio" value="${esc(S.custQ)}" aria-label="Buscar cliente"></div>
+      <div class="seg" role="group" aria-label="Ordenar">${[["recent","Recientes"],["orders","Más pedidos"],["spent","Más gasto"]].map(([v,l])=>`<button data-act="custSort" data-v="${v}" aria-pressed="${(S.custSort||"recent")===v}">${l}</button>`).join("")}</div></div>
+    ${list.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Cliente</th><th>Pedidos</th><th>Gastado</th><th>Último</th><th>Suele pedir</th></tr></thead><tbody>
+      ${list.map(c=>{ const hb=habitual(c)[0]; return `<tr class="click ${S.custSel===c.id?"selrow":""}" data-act="custOpen" data-k="${c.id}"><td><b>${esc(c.name||"Sin nombre")}</b>${c.consent?` <span class="pill nodot s-listo" style="font-size:10.5px;padding:1px 6px">Promos</span>`:""}<div class="muted" style="font-size:12px">${esc(c.barrio||"")} · <span class="mono">${esc(c.phone||"")}</span></div></td>
+        <td class="num">${c.orders||0}</td><td class="num">${money(c.spent||0)}</td><td style="white-space:nowrap">${agoTxt(c.lastAt)}</td><td class="muted" style="font-size:13px">${hb?esc(hb.name):"—"}</td></tr>`; }).join("")}</tbody></table></div>`
+      :`<div class="empty">${all.length?"Ningún cliente coincide con la búsqueda.":"Aquí aparecerán tus clientes. Cada domicilio que registres crea o actualiza su ficha."}</div>`}
+  </div><div>${custCard()}</div></div>`;
+  return h;
+}
+function custCard(){
+  const c=S.customers.find(x=>x.id===S.custSel);
+  if(!c) return `<div class="card"><div class="empty" style="padding:50px 20px">${ic("cliente")}Elige un cliente para ver su ficha, su pedido habitual y su historial.</div></div>`;
+  const e=S.custEdit||{}, hb=habitual(c), avg=c.orders?(c.spent||0)/c.orders:0;
+  return `<div class="card"><div class="card-h"><div><h3 style="font-size:17px">${esc(c.name||"Sin nombre")}</h3><div class="row" style="gap:6px;margin-top:4px"><span class="mono muted" style="font-size:13px">${esc(c.phone||"")}</span>${c.consent?`<span class="pill s-listo">Acepta promociones</span>`:`<span class="pill s-libre">Sin promociones</span>`}</div></div>
+      <div class="row" style="gap:6px"><a class="btn sm" href="${esc(waTo(c.phone,""))}" target="_blank" rel="noopener">${ic("chat")}WhatsApp</a><button class="btn sm ghost" data-act="custClose" aria-label="Cerrar ficha">✕</button></div></div>
+    <div class="facts" style="border-top:0;border-bottom:1px solid var(--line)">
+      <div><span class="label">Pedidos</span><b class="num">${c.orders||0}</b></div><div><span class="label">Gastado</span><b class="num">${money(c.spent||0)}</b></div>
+      <div><span class="label">Ticket medio</span><b class="num">${money(avg)}</b></div><div><span class="label">Último</span><b>${agoTxt(c.lastAt)}</b><span class="muted">cliente desde ${c.firstAt?new Date(c.firstAt).toLocaleDateString("es-ES",{month:"short",year:"numeric"}):"—"}</span></div></div>
+    <div class="card-b stack">
+      <span class="label">Pedido habitual</span>
+      ${hb.length?`<div class="hbars">${hb.map(x=>`<div class="hb"><span class="nm">${x.qty}× ${esc(x.name)}</span><span class="tr"><i style="width:${x.times/hb[0].times*100}%"></i></span><span class="v num" style="font-weight:600">${x.times} uds.</span></div>`).join("")}</div>
+        <button class="btn pri" data-act="useHabit" data-k="${c.id}">${ic("moto")}Repetir su pedido habitual</button>`:`<p class="muted" style="margin:0">Todavía sin pedidos.</p>`}
+      <span class="label" style="margin-top:6px">Datos</span>
+      <div class="fgrid">
+        <label class="f">Nombre<input type="text" id="ceName" data-ce="name" value="${esc(e.name)}"></label>
+        <label class="f">Barrio o CP<input type="text" id="ceBarrio" data-ce="barrio" value="${esc(e.barrio)}"></label>
+        <label class="f full">Dirección<input type="text" id="ceAddr" data-ce="address" value="${esc(e.address)}"></label>
+        <label class="f full">Notas (alergias, preferencias, portal…)<input type="text" id="ceNotes" data-ce="notes" value="${esc(e.notes)}" placeholder="Ej: sin cebolla, timbre 3B"></label>
+        <label class="row full" style="gap:10px;font-size:13.5px"><span class="switch"><input type="checkbox" id="ceConsent" data-act="ceConsent" ${e.consent?"checked":""}><span></span></span>Acepta recibir promociones por WhatsApp</label>
+      </div>
+      <button class="btn" data-act="custSave">${ic("check")}Guardar ficha</button>
+      <span class="label" style="margin-top:6px">Últimos pedidos</span>
+      ${(c.history||[]).length?`<div class="stack" style="gap:0">${c.history.map(x=>`<div class="hrow"><span class="mono muted">${new Date(x.at).toLocaleDateString("es-ES",{day:"numeric",month:"short"})}</span><span>${esc(x.txt||"")}</span><b class="num">${money(x.total||0)}</b></div>`).join("")}</div>`:`<p class="muted" style="margin:0">Sin historial.</p>`}
+    </div></div>`;
+}
+
+/* ----- Campañas ----- */
+function audienceOf(cm){
+  const base=S.customers.filter(c=>c.consent && custKey(c.phone).length>=9);
+  if(cm.audience==="plato") return base.filter(c=>c.items&&c.items[cm.dishId]&&c.items[cm.dishId].qty>0);
+  if(cm.audience==="inactivos") return base.filter(c=>daysAgo(c.lastAt)>=(+cm.days||30));
+  if(cm.audience==="barrio") return base.filter(c=>zoneOf(c).toLowerCase()===String(cm.barrio||"").trim().toLowerCase());
+  return base;
+}
+const AUD = {todos:"Todos los que aceptan promociones",plato:"Quienes ya pidieron este plato",inactivos:"Quienes no piden hace tiempo",barrio:"Un barrio"};
+const CAMP_TPL = "Hola {nombre} 👋 Hoy en Hecho en mi Pueblo tenemos {plato}{precio}. Pídelo aquí 👉 {link}";
+function campText(tpl,cm,c){
+  const m=item(cm.dishId)||{name:cm.dishName||"",price:cm.normalPrice||0}, normal=cm.normalPrice!=null?cm.normalPrice:priceFor(Object.assign({},m),"local");
+  const precio = cm.price ? ` a solo ${money(cm.price)} (antes ${money(normal)})` : (normal?` a ${money(normal)}`:"");
+  return String(tpl||CAMP_TPL).replace(/\{nombre\}/g,((c&&c.name)||"").trim().split(" ")[0]||"").replace(/\{plato\}/g,m.name||cm.dishName||"").replace(/\{precio\}/g,precio).replace(/\{link\}/g,domLink());
+}
+function campResults(cm){
+  const rec=new Set(Object.keys(cm.sent||{})); let n=0, eur=0;
+  S.customers.forEach(c=>{ if(!rec.has(c.id)) return; (c.history||[]).forEach(x=>{ if(x.at>=cm.createdAt && (x.ids||[]).includes(cm.dishId)){ n++; eur+=x.total||0; } }); });
+  return {n,eur:r2(eur)};
+}
+function vCampanas(){
+  const cons=S.customers.filter(c=>c.consent).length, list=S.campaigns;
+  const sentAll=list.reduce((a,c)=>a+Object.keys(c.sent||{}).length,0), res=list.map(campResults), ordAll=res.reduce((a,r)=>a+r.n,0), eurAll=r2(res.reduce((a,r)=>a+r.eur,0));
+  let h=`<div class="kpis">
+    <div class="kpi"><div class="label">Campañas</div><div class="v num">${list.length}</div><div class="d">${list.filter(c=>Date.now()<=(c.until||0)).length} activas</div></div>
+    <div class="kpi"><div class="label">Mensajes enviados</div><div class="v num">${sentAll}</div><div class="d">por WhatsApp</div></div>
+    <div class="kpi"><div class="label">Pedidos generados</div><div class="v num">${ordAll}</div><div class="d">${money(eurAll)} en ventas</div></div>
+    <div class="kpi"><div class="label">Aceptan promociones</div><div class="v num">${cons}</div><div class="d">de ${S.customers.length} clientes</div></div>
+  </div><div class="split"><div class="stack">
+    <button class="btn pri" data-act="campNew" style="align-self:flex-start">${ic("plus")}Nueva campaña</button>
+    ${list.length?list.map((cm,i)=>{ const sent=Object.keys(cm.sent||{}).length, tot=(cm.recipients||[]).length, live=Date.now()<=(cm.until||0), r=res[i];
+      return `<button class="campi ${S.campSel===cm.id&&!S.campNew?"on":""}" data-act="campOpen" data-id="${cm.id}"><div class="row" style="justify-content:space-between"><b>${esc(cm.title||cm.dishName)}</b><span class="pill ${live?"s-listo":"s-libre"}">${live?"Activa":"Terminada"}</span></div>
+        <span class="muted">${new Date(cm.createdAt).toLocaleDateString("es-ES",{day:"numeric",month:"short"})} · ${esc(AUD[cm.audience]||"")}</span>
+        <div class="obar" style="height:8px"><i class="c1" style="flex:${sent}"></i><i style="flex:${Math.max(0,tot-sent)};background:var(--sunken)"></i></div>
+        <span class="num" style="font-size:13px">${sent} de ${tot} enviados · <b>${r.n} pedido${r.n===1?"":"s"}</b>${r.eur?` · ${money(r.eur)}`:""}</span></button>`; }).join("")
+      :`<div class="card"><div class="empty">Todavía no hay campañas. Crea la primera para promocionar un plato.</div></div>`}
+  </div><div>${S.campNew||!list.length?campForm():campDetail()}</div></div>`;
+  return h;
+}
+function campForm(){
+  const cm=S.cmp, dishes=chMenu("dom").filter(m=>m.available!==false);
+  if(!cm.dishId && dishes[0]) cm.dishId=dishes[0].id;
+  const m=item(cm.dishId)||{}, normal=m.id?priceFor(Object.assign({},m,{}),"local"):0, domNormal=m.id&&m.domPrice?+m.domPrice:normal;
+  const draft={dishId:cm.dishId,dishName:m.name,price:+String(cm.price).replace(",",".")||0,normalPrice:domNormal,audience:cm.audience,days:cm.days,barrio:cm.barrio};
+  const aud=audienceOf(draft), zones=[...new Set(S.customers.map(zoneOf))].filter(z=>z!=="Sin barrio").sort();
+  const sample=campText(cm.msg||CAMP_TPL,draft,aud[0]||{name:"Laura"});
+  return `<div class="card"><div class="card-h"><h3>Nueva campaña</h3>${S.campaigns.length?`<button class="btn sm ghost" data-act="campCancel">Cancelar</button>`:""}</div><div class="card-b stack">
+    <div class="fgrid">
+      <label class="f full">Plato a promocionar<select id="cmDish" data-cm="dishId">${dishes.map(d=>`<option value="${d.id}" ${d.id===cm.dishId?"selected":""}>${esc(d.name)} · ${money(priceFor(d,"dom"))}</option>`).join("")}</select></label>
+      <label class="f">Precio de promoción (opcional)<input type="text" inputmode="decimal" id="cmPrice" data-cm="price" value="${esc(cm.price)}" placeholder="Normal: ${money(domNormal)}"></label>
+      <label class="f">Destacar en el menú a domicilio<select id="cmValid" data-cm="valid"><option value="0" ${cm.banner?"":"selected"}>No destacar</option>${[1,3,7,14].map(n=>`<option value="${n}" ${cm.banner&&+cm.valid===n?"selected":""}>Durante ${n} día${n>1?"s":""}</option>`).join("")}</select></label>
+    </div>
+    <span class="label">¿A quién se envía?</span>
+    <div class="aud">${Object.entries(AUD).map(([v,l])=>`<button data-act="cmAud" data-v="${v}" aria-pressed="${cm.audience===v}">${l}</button>`).join("")}</div>
+    ${cm.audience==="inactivos"?`<label class="f">Sin pedir desde hace<select id="cmDays" data-cm="days">${[15,30,60,90].map(n=>`<option value="${n}" ${+cm.days===n?"selected":""}>${n} días o más</option>`).join("")}</select></label>`:""}
+    ${cm.audience==="barrio"?`<label class="f">Barrio<select id="cmBarrio" data-cm="barrio"><option value="">Elige un barrio</option>${zones.map(z=>`<option ${z===cm.barrio?"selected":""}>${esc(z)}</option>`).join("")}</select></label>`:""}
+    <div class="audn"><b class="num">${aud.length}</b> cliente${aud.length===1?"":"s"} recibirá${aud.length===1?"":"n"} el mensaje${aud.length?`: ${aud.slice(0,4).map(c=>esc((c.name||"").split(" ")[0])).join(", ")}${aud.length>4?"…":""}`:". Prueba con otro público."}</div>
+    <label class="f">Mensaje <span style="font-weight:500">· usa {nombre}, {plato}, {precio} y {link}</span><textarea id="cmMsg" data-cm="msg" placeholder="${esc(CAMP_TPL)}">${esc(cm.msg)}</textarea></label>
+    <span class="label">Así lo recibe ${esc(((aud[0]&&aud[0].name)||"Laura").split(" ")[0])}</span>
+    <div class="wabubble">${esc(sample)}</div>
+    <button class="btn pri big" data-act="campCreate" ${aud.length&&m.id?"":"disabled"}>Crear campaña para ${aud.length} cliente${aud.length===1?"":"s"}</button>
+    <p class="muted" style="margin:0;font-size:12px">Solo se incluyen clientes que aceptaron recibir promociones, como pide la ley de protección de datos. Cada mensaje se abre en WhatsApp y lo envías tú.</p>
+  </div></div>`;
+}
+function campDetail(){
+  const cm=S.campaigns.find(x=>x.id===S.campSel)||S.campaigns[0]; if(!cm) return "";
+  const sent=cm.sent||{}, recs=(cm.recipients||[]).map(k=>S.customers.find(c=>c.id===k)||{id:k,name:"Cliente",phone:k}), nSent=Object.keys(sent).length;
+  const live=Date.now()<=(cm.until||0), onMenu=activePromo()&&S.config.promo.campaignId===cm.id, r=campResults(cm);
+  return `<div class="card"><div class="card-h"><div><h3 style="font-size:17px">${esc(cm.title||cm.dishName)}</h3><span class="muted" style="font-size:13px">Creada el ${new Date(cm.createdAt).toLocaleDateString("es-ES",{day:"numeric",month:"long"})} · ${esc(AUD[cm.audience]||"")}</span></div>
+      <span class="pill ${live?"s-listo":"s-libre"}">${live?"Activa hasta el "+new Date(cm.until).toLocaleDateString("es-ES",{day:"numeric",month:"short"}):"Terminada"}</span></div>
+    <div class="facts" style="border-top:0;border-bottom:1px solid var(--line)">
+      <div><span class="label">Enviados</span><b class="num">${nSent} de ${recs.length}</b></div>
+      <div><span class="label">Pedidos con el plato</span><b class="num">${r.n}</b><span class="muted">de clientes contactados</span></div>
+      <div><span class="label">Ventas</span><b class="num">${money(r.eur)}</b></div>
+      <div><span class="label">Conversión</span><b class="num">${nSent?Math.round(r.n/nSent*100):0} %</b></div></div>
+    <div class="card-b stack">
+      <div class="row" style="justify-content:space-between">${onMenu?`<span class="pill s-listo">Destacada en el menú a domicilio</span><button class="btn sm" data-act="campUnpin">Quitar del menú</button>`
+        :`<span class="muted" style="font-size:13px">No está destacada en el menú.</span><button class="btn sm" data-act="campPin" data-id="${cm.id}">Destacar 3 días</button>`}</div>
+      <div class="obar" style="height:10px"><i class="c1" style="flex:${nSent}"></i><i style="flex:${Math.max(0,recs.length-nSent)};background:var(--sunken)"></i></div>
+      <span class="label">Enviar uno a uno</span>
+      <div class="stack" style="gap:0">${recs.map(c=>{ const ts=sent[c.id]; return `<div class="hrow"><span><b>${esc(c.name||"")}</b><span class="muted" style="font-size:12px;display:block">${esc(c.barrio||"")} · último pedido ${agoTxt(c.lastAt)}</span></span>
+        ${ts?`<span class="pill s-listo">Enviado ${hhmm(ts)}</span><a class="btn sm ghost" href="${esc(waTo(c.phone,campText(cm.msg,cm,c)))}" target="_blank" rel="noopener" data-act="campSend" data-id="${cm.id}" data-k="${c.id}">Reenviar</a>`
+          :`<a class="btn sm wa" href="${esc(waTo(c.phone,campText(cm.msg,cm,c)))}" target="_blank" rel="noopener" data-act="campSend" data-id="${cm.id}" data-k="${c.id}">${ic("chat")}Enviar</a>`}</div>`; }).join("")}</div>
+      <span class="label">Mensaje</span><div class="wabubble">${esc(campText(cm.msg,cm,recs[0]||{}))}</div>
+      ${live?`<button class="btn sm ghost" data-act="campEnd" data-id="${cm.id}" style="align-self:flex-start">Terminar campaña</button>`:""}
+    </div></div>`;
+}
+async function createCampaign(){
+  const cm=S.cmp, m=item(cm.dishId); if(!m) return;
+  const domNormal=m.domPrice?+m.domPrice:m.price, price=+String(cm.price).replace(",",".")||0;
+  if(price && price>=domNormal){ toast("El precio de promoción debe ser menor que el normal."); return; }
+  const draft={dishId:m.id,dishName:m.name,price:price||null,normalPrice:domNormal,audience:cm.audience,days:+cm.days||30,barrio:cm.barrio||""};
+  const rec=audienceOf(draft).map(c=>c.id); if(!rec.length){ toast("No hay clientes en ese público."); return; }
+  const now=Date.now(), days=cm.banner?(+cm.valid||3):3, until=now+days*86400000;
+  const title=`${m.name}${price?" a "+money(price):""}`;
+  const doc=Object.assign({},draft,{title,msg:cm.msg||CAMP_TPL,createdAt:now,until,banner:!!cm.banner,recipients:rec,sent:{}});
+  let newId=null;
+  const ok=await w(async db=>{
+    const ref=db.collection("campaigns").doc(); newId=ref.id; await ref.set(doc);
+    if(cm.banner) await db.doc("config/main").set(Object.assign({},S.config,{promo:{campaignId:ref.id,dishId:m.id,title,price:price||null,until}}));
+  },"Campaña creada");
+  if(ok){ S.campSel=newId; S.campNew=false; S.cmp={dishId:"",price:"",audience:"todos",days:"30",barrio:"",banner:true,valid:"3",msg:""}; render(); }
 }
 
 /* ----- Cocina ----- */
@@ -1296,17 +1851,10 @@ function vCaja(){
 /* ----- Ajustes ----- */
 function vAjustes(){
   const N=+S.config.tables||10, demo=S.orders.filter(o=>o.demo).length+S.deliveries.filter(d=>d.demo).length;
-  let h = head("Ajustes","Mesas, WhatsApp, códigos QR y menú. Los cambios llegan a todos los dispositivos.");
-  h += `<div class="split"><div class="card"><div class="card-h"><h3>Menú</h3><span class="muted" style="font-size:13px">Precio y disponibilidad se ven al instante</span></div>
-    <div class="tablewrap"><table class="t"><thead><tr><th>Producto</th><th>Sale por</th><th>Precio €</th><th>Disponible</th></tr></thead><tbody>
-    ${menu().map(m=>`<tr><td><b>${esc(m.name)}</b><div class="muted" style="font-size:12px">${esc(m.cat)}</div></td>
-      <td><select id="st-${m.id}" data-mfield="station" data-id="${m.id}"><option value="cocina" ${m.station==="cocina"?"selected":""}>Cocina</option><option value="barra" ${m.station==="barra"?"selected":""}>Barra</option></select></td>
-      <td><input type="number" id="pr-${m.id}" data-mfield="price" data-id="${m.id}" value="${m.price}" step="0.1" min="0" class="num"></td>
-      <td><label class="switch"><input type="checkbox" id="av-${m.id}" data-mfield="available" data-id="${m.id}" ${m.available!==false?"checked":""} aria-label="${esc(m.name)} disponible"><span></span></label></td></tr>`).join("")}
-    </tbody></table></div>
-    <div class="card-b stack" style="border-top:1px solid var(--line)"><span class="label">Agregar producto</span>
-      <div class="row"><input type="text" id="nName" placeholder="Nombre" style="flex:2 1 160px"><input type="text" id="nCat" placeholder="Categoría" list="catlist" style="flex:1 1 120px"><datalist id="catlist">${cats().map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
-      <div class="row"><input type="number" id="nPrice" placeholder="Precio €" step="0.1" style="flex:1 1 100px"><select id="nSt" style="flex:1 1 100px"><option value="cocina">Cocina</option><option value="barra">Barra</option></select><button class="btn pri" data-act="addItem">${ic("plus")}Agregar</button></div></div>
+  let h = head("Ajustes","WhatsApp, envíos, pagos, mesas y códigos QR. Los cambios llegan a todos los dispositivos.");
+  h += `<div class="split"><div class="stack"><div class="card"><div class="card-h"><h3>Menús</h3></div><div class="card-b stack">
+      <p class="muted" style="margin:0;font-size:13.5px">Los menús (a domicilio y del local), precios y agotados ahora se editan en su propia sección.</p>
+      <button class="btn" data-go="cliente">${ic("cliente")}Ir a Menús</button></div></div>
   </div><div class="stack">
     <div class="card"><div class="card-h"><h3>Local y domicilios</h3></div><div class="card-b stack">
       <div class="fgrid">
@@ -1378,7 +1926,7 @@ $root.addEventListener("click", async ev=>{
   const findD = id => S.deliveries.find(x=>x.id===id);
   switch(a){
     case "jump": ev.preventDefault(); { const s=document.getElementById("c-"+d.cat); if(s) s.scrollIntoView({behavior:"smooth",block:"start"}); } break;
-    case "add": addTo(S.cart,d.id); S.sent=null; render(); break;
+    case "add": addTo(S.cart,d.id,S.delivery?"dom":"local"); S.sent=null; render(); break;
     case "dec": { const i=S.cart.map(l=>l.id).lastIndexOf(d.id); if(i>-1){ S.cart[i].qty--; if(!S.cart[i].qty) S.cart.splice(i,1);} render(); } break;
     case "cinc": S.cart[+d.i].qty++; render(); break;
     case "cdec": S.cart[+d.i].qty--; if(!S.cart[+d.i].qty) S.cart.splice(+d.i,1); if(!S.cart.length) S.cartOpen=false; render(); break;
@@ -1405,6 +1953,34 @@ $root.addEventListener("click", async ev=>{
       const go2=S.deliveries.filter(x=>(S.routeSel||[]).includes(x.id)&&dInfo(x).stage==="listo");
       for(const x of go2){ S.drivers[x.id]=driver; await dispatch(x); }
       S.routeSel=(S.routeSel||[]).filter(id=>!go2.some(x=>x.id===id)); toast(`${go2.length} domicilio${go2.length===1?"":"s"} en camino con ${driver}`); render(); } break;
+    case "theme": setTheme(d.v); render(); break;
+    case "dTab": S.dTab=d.v; render(); window.scrollTo(0,0); break;
+    case "custSort": S.custSort=d.v; render(); break;
+    case "custOpen": { const c=S.customers.find(x=>x.id===d.k); if(!c) break; S.custSel=c.id; S.custEdit={name:c.name||"",address:c.address||"",barrio:c.barrio||"",notes:c.notes||"",consent:!!c.consent}; S.dTab="clientes"; if(S.view!=="domicilios") go("domicilios"); else { render(); window.scrollTo(0,0); } } break;
+    case "custClose": S.custSel=null; render(); break;
+    case "ceConsent": if(S.custEdit) S.custEdit.consent=el.checked; break;
+    case "custSave": { const c=S.customers.find(x=>x.id===S.custSel), e=S.custEdit; if(!c||!e) break;
+      w(db=>db.doc("customers/"+c.id).set(Object.assign({},c,{id:undefined},{name:e.name.trim(),address:e.address.trim(),barrio:e.barrio.trim(),notes:e.notes.trim(),consent:!!e.consent,consentAt:e.consent&&!c.consent?Date.now():(e.consent?c.consentAt||null:null)})),"Ficha guardada"); } break;
+    case "useHabit": { const c=S.customers.find(x=>x.id===d.k); if(!c) break;
+      Object.assign(S.dForm,{name:c.name||"",phone:c.phone||"",address:c.address||"",barrio:c.barrio||"",notes:c.notes||S.dForm.notes,consent:!!c.consent});
+      S.dCart=[]; habitual(c).forEach(x=>{ for(let i=0;i<x.qty;i++) addTo(S.dCart,x.id,"dom"); });
+      S.dTab="pedidos"; render(); window.scrollTo(0,0); toast(S.dCart.length?"Pedido habitual cargado: revisa y registra":"Datos cargados"); } break;
+    case "gConsent": S.gForm.consent=el.checked; updateWaLink(); break;
+    case "dConsent": S.dForm.consent=el.checked; break;
+    case "campNew": S.campNew=true; render(); break;
+    case "campCancel": S.campNew=false; render(); break;
+    case "campOpen": S.campSel=d.id; S.campNew=false; render(); break;
+    case "cmAud": S.cmp.audience=d.v; render(); break;
+    case "campCreate": createCampaign(); break;
+    case "campSend": { const cm=S.campaigns.find(x=>x.id===d.id); if(!cm) break; const sent=Object.assign({},cm.sent||{},{[d.k]:Date.now()}); w(db=>db.doc("campaigns/"+cm.id).update({sent})); } break;
+    case "campUnpin": w(db=>db.doc("config/main").set(Object.assign({},S.config,{promo:null})),"Quitada del menú"); break;
+    case "campPin": { const cm=S.campaigns.find(x=>x.id===d.id); if(!cm) break; const until=Date.now()+3*86400000;
+      w(async db=>{ await db.doc("config/main").set(Object.assign({},S.config,{promo:{campaignId:cm.id,dishId:cm.dishId,title:cm.title,price:cm.price||null,until}})); if((cm.until||0)<until) await db.doc("campaigns/"+cm.id).update({until}); },"Destacada en el menú 3 días"); } break;
+    case "campEnd": { const cm=S.campaigns.find(x=>x.id===d.id); if(!cm) break;
+      w(async db=>{ await db.doc("campaigns/"+cm.id).update({until:Date.now()-1}); if(S.config.promo&&S.config.promo.campaignId===cm.id) await db.doc("config/main").set(Object.assign({},S.config,{promo:null})); },"Campaña terminada"); } break;
+    case "period": S.period=d.v; S.pOff=0; if(d.v==="rango"&&!S.rFrom){ const t=new Date(), a=new Date(); a.setDate(t.getDate()-29); S.rFrom=dayKey(a); S.rTo=dayKey(t); } render(); break;
+    case "pNav": S.pOff=Math.min(0,S.pOff+(+d.v)); if(S.period==="rango"&&S.pOff!==0){ const R=periodRange("rango",S.pOff); S.rFrom=dayKey(R.a); S.rTo=dayKey(R.b); S.pOff=0; } render(); break;
+    case "pQuick": { const t=new Date(); let a=new Date(); if(d.v==="y") a=new Date(t.getFullYear(),0,1); else a.setDate(t.getDate()-(+d.v-1)); S.rFrom=dayKey(a); S.rTo=dayKey(t); S.pOff=0; render(); } break;
     case "logout": if(HOST){ try{ await HOST.signOut(); }catch(e){} location.reload(); } break;
     case "closeAsk": S.confirmClose=true; render(); break;
     case "closeNo": S.confirmClose=false; render(); break;
@@ -1423,7 +1999,7 @@ $root.addEventListener("click", async ev=>{
     case "pickCat": S.pickCat=d.c; render(); break;
     case "dPick": S.dPick=d.c; render(); break;
     case "sadd": addTo(S.staffCart,d.id); render(); break;
-    case "dadd": addTo(S.dCart,d.id); render(); break;
+    case "dadd": addTo(S.dCart,d.id,"dom"); render(); break;
     case "sinc": S.staffCart[+d.i].qty++; render(); break;
     case "sdec": S.staffCart[+d.i].qty--; if(!S.staffCart[+d.i].qty) S.staffCart.splice(+d.i,1); render(); break;
     case "dinc": S.dCart[+d.i].qty++; render(); break;
@@ -1432,12 +2008,12 @@ $root.addEventListener("click", async ev=>{
     case "loadCode": { const p=parseCode(S.codeIn); if(!p){ toast("Código no válido: debe empezar por M y el número de mesa."); break; } S.codeIn="";
       if(p.table<0){ S.dCart=p.cart; go("domicilios"); toast("Pedido de domicilio cargado: completa los datos"); break; }
       S.selTable=p.table; S.staffCart=p.cart; render(); toast("Pedido cargado: revisa y envía"); } break;
-    case "readMsg": { const r=parseWhatsApp(S.dPaste); const f=r.form; ["name","phone","address","barrio","notes","cashFor"].forEach(k=>{ if(f[k]) S.dForm[k]=f[k]; }); S.dForm.when=f.when; if(f.pay) S.dForm.pay=f.pay; S.dForm.channel="WhatsApp";
+    case "readMsg": { const r=parseWhatsApp(S.dPaste); const f=r.form; ["name","phone","address","barrio","notes","cashFor"].forEach(k=>{ if(f[k]) S.dForm[k]=f[k]; }); S.dForm.when=f.when; S.dForm.consent=!!f.consent; if(f.pay) S.dForm.pay=f.pay; S.dForm.channel="WhatsApp";
       if(r.cart&&r.cart.length){ S.dCart=r.cart; toast("Pedido leído: revisa y registra"); } else toast(f.name?"Datos leídos. No vino código: agrega los productos a mano.":"No encontré datos en el mensaje.");
       render(); } break;
     case "dsend": {
       const f=S.dForm; if(!f.name.trim()||!f.address.trim()){ toast("Falta nombre o dirección."); break; }
-      const ok=await createDelivery(f,S.dCart,"equipo"); if(ok){ S.dCart=[]; S.dPaste=""; S.dForm={name:"",phone:"",address:"",barrio:"",notes:"",channel:"WhatsApp",when:"entrega",pay:"Efectivo",cashFor:""}; toast("Domicilio registrado y enviado a cocina"); render(); }
+      const ok=await createDelivery(f,S.dCart,"equipo"); if(ok){ S.dCart=[]; S.dPaste=""; S.dForm={name:"",phone:"",address:"",barrio:"",notes:"",channel:"WhatsApp",when:"entrega",pay:"Efectivo",cashFor:"",consent:false}; toast("Domicilio registrado y enviado a cocina"); render(); }
     } break;
     case "dispatch": { const x=findD(d.id); if(x) dispatch(x); } break;
     case "dlAsk": S.confirmDl=d.id; render(); break;
@@ -1450,7 +2026,7 @@ $root.addEventListener("click", async ev=>{
     case "copyWelcome": copy(welcomeMsg(),"Mensaje copiado"); break;
     case "copyTpl": { const t=WA_TEMPLATES().find(x=>x.k===d.k); if(t) copy(t.text,"Mensaje copiado"); } break;
     case "copyDomLink": copy(baseLink()+"#domicilio","Link copiado"); break;
-    case "prevMode": S.previewMode=d.v; S.delivery=d.v==="dom"; S.table=S.delivery?-1:(S.table>0?S.table:1); S.cart=[]; S.sent=null; render(); break;
+    case "menuTab": S.menuTab=d.v; S.cart=[]; S.sent=null; S.q=""; render(); break;
     case "toCaja": S.cajaSel=+d.t; S.confirmPay=false; S.received=""; S.split=1; go("caja"); break;
     case "station": S.station=d.v; render(); break;
     case "sound": try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); await actx.resume(); S.sound=!S.sound; if(S.sound) beep(); }catch(e){} render(); break;
@@ -1487,7 +2063,8 @@ $root.addEventListener("click", async ev=>{
       const name=document.getElementById("nName").value.trim(), cat=document.getElementById("nCat").value.trim()||"Otros", price=r2(document.getElementById("nPrice").value), st=document.getElementById("nSt").value;
       if(!name||!price){ toast("Escribe nombre y precio."); break; }
       const id="X"+Date.now().toString(36).toUpperCase().slice(-5);
-      w(db=>db.doc("menu/"+id).set({name,cat,price,station:st,desc:"",available:true}),"Producto agregado");
+      const nd=document.getElementById("nDom"), nl=document.getElementById("nLocal");
+      w(db=>db.doc("menu/"+id).set({name,cat,price,station:st,desc:"",available:true,dom:nd?nd.checked:true,local:nl?nl.checked:true}),"Producto agregado");
     } break;
   }
 });
@@ -1497,6 +2074,9 @@ $root.addEventListener("input", ev=>{
   else if(t.dataset.cnote){ const c=t.dataset.cnote==="s"?S.staffCart:S.dCart; if(c[+t.dataset.i]) c[+t.dataset.i].note=t.value; }
   else if(t.dataset.gform){ S.gForm[t.dataset.gform]=t.value; updateWaLink(); }
   else if(t.dataset.dform){ S.dForm[t.dataset.dform]=t.value; }
+  else if(t.dataset.ce){ if(S.custEdit) S.custEdit[t.dataset.ce]=t.value; }
+  else if(t.dataset.cm){ S.cmp[t.dataset.cm]=t.value; if(t.tagName==="SELECT"){ if(t.dataset.cm==="valid"){ S.cmp.banner=t.value!=="0"; } render(); } }
+  else if(t.dataset.bind==="custQ"){ S.custQ=t.value; render(); }
   else if(t.dataset.cf){ S.cf[t.dataset.cf]=t.value; }
   else if(t.dataset.driver){ S.drivers[t.dataset.driver]=t.value; }
   else if(t.dataset.bind==="q"){ S.q=t.value; const pos=t.selectionStart; render(); const n=document.getElementById("q"); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } }
@@ -1504,15 +2084,16 @@ $root.addEventListener("input", ev=>{
 });
 $root.addEventListener("change", ev=>{
   const t=ev.target;
-  if(t.dataset.act==="prevTable"){ S.table=+t.value; S.cart=[]; S.sent=null; render(); return; }
   if(t.dataset.act==="tip"){ S.tip=t.checked; render(); return; }
+  if(t.dataset.act==="pFrom"||t.dataset.act==="pTo"){ if(t.value){ S[t.dataset.act==="pFrom"?"rFrom":"rTo"]=t.value; S.pOff=0; } render(); return; }
   if(t.dataset.cf){ render(); return; }
+  if(t.id==="dPhone"||t.id==="cmPrice"||t.id==="cmMsg"){ render(); return; }
   if(t.dataset.mfield){
-    const id=t.dataset.id, f=t.dataset.mfield, v = f==="available"?t.checked : f==="price"?Math.max(0,r2(t.value)) : t.value;
+    const id=t.dataset.id, f=t.dataset.mfield, v = (f==="available"||f==="dom"||f==="local")?t.checked : f==="price"?Math.max(0,r2(t.value)) : f==="domPrice"?(t.value===""?null:Math.max(0,r2(t.value))) : t.value;
     const base=item(id)||{}; const cur=Object.assign({},S.menuDb[id]||{});
     if(!BASE_MENU.find(b=>b.id===id)) Object.assign(cur,{name:base.name,cat:base.cat,price:base.price,station:base.station,desc:base.desc||"",available:base.available!==false});
     cur[f]=v;
-    w(db=>db.doc("menu/"+id).set(cur), f==="available"?(v?"Disponible otra vez":"Marcado como agotado"):"Guardado");
+    w(db=>db.doc("menu/"+id).set(cur), f==="available"?(v?"Disponible otra vez":"Marcado como agotado"):f==="dom"?(v?"Ahora se ofrece a domicilio":"Quitado del menú a domicilio"):f==="local"?(v?"Ahora está en el menú del local":"Quitado del menú del local"):"Guardado");
   }
 });
 $root.addEventListener("submit", async ev=>{
